@@ -12,6 +12,10 @@ Five canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-f
 
 Single-context layout with `CONTEXT.md` at root and `docs/adr/` for decisions. See `docs/agents/domain.md`.
 
+### Language
+
+Write all markdown you generate for this repo — specs, issues, task files, `CONTEXT.md`, ADRs, reports — in **English**. Code, commands, file paths, identifiers, and quoted error messages stay verbatim. This applies to new output only; don't translate existing docs.
+
 ### Test strategy
 
 **Discipline**: TDD. Write the failing test first, then make it pass.
