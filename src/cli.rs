@@ -12,6 +12,17 @@ pub enum Command {
     /// Manage omg configuration
     #[command(arg_required_else_help = true)]
     Config(ConfigArgs),
+
+    /// Run omg as a server
+    #[command(arg_required_else_help = true)]
+    Server(ServerArgs),
+}
+
+#[derive(Args, Debug)]
+pub struct ServerArgs {
+    /// Serve the Model Context Protocol over stdio.
+    #[arg(long)]
+    pub mcp: bool,
 }
 
 #[derive(Args, Debug)]
@@ -41,6 +52,7 @@ mod tests {
     fn config_args(args: &[&str]) -> ConfigArgs {
         match parse(args).unwrap().command {
             Command::Config(a) => a,
+            Command::Server(_) => panic!("expected config"),
         }
     }
 
@@ -88,5 +100,23 @@ mod tests {
     fn config_list_conflicts_with_endpoint() {
         let err = parse(&["omg", "config", "--list", "-E", "https://x.dev"]).unwrap_err();
         assert_eq!(err.kind(), ErrorKind::ArgumentConflict);
+    }
+
+    #[test]
+    fn server_accepts_mcp_flag() {
+        match parse(&["omg", "server", "--mcp"]).unwrap().command {
+            Command::Server(a) => assert!(a.mcp),
+            Command::Config(_) => panic!("expected server"),
+        }
+    }
+
+    #[test]
+    fn bare_server_exits_with_help_code() {
+        let err = parse(&["omg", "server"]).unwrap_err();
+        assert_eq!(
+            err.kind(),
+            ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
+        );
+        assert_eq!(err.exit_code(), 2);
     }
 }

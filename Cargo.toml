@@ -14,8 +14,11 @@ path = "src/main.rs"
 anyhow = "1.0.104"
 clap = { version = "4.6.6", features = ["derive"] }
 home = "0.5.12"
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json"] }
+rmcp = { version = "3.4.0", features = ["server", "macros", "transport-io"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "io-std", "time"] }
 url = "2.5.8"
 
 [dev-dependencies]
