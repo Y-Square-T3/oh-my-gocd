@@ -1,0 +1,206 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Bump & Publish
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo install cargo-edit --version 0.13.13 --locked
+
+      - name: Bump version
+        run: cargo set-version --bump ${{ inputs.bump }}
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit & tag
+        run: |
+          git add Cargo.toml Cargo.lock
+          git commit -m "release: v${{ steps.version.outputs.version }}"
+          git tag "v${{ steps.version.outputs.version }}"
+
+      - name: Publish to crates.io
+        run: cargo publish --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Push to GitHub
+        run: |
+          git push origin main
+          git push origin "v${{ steps.version.outputs.version }}"
+
+  build-binaries:
+    name: Build ${{ matrix.label }}
+    needs: release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - label: linux-amd64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bin: omg
+            asset: omg-linux-amd64.tar.gz
+          - label: macos-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            bin: omg
+            asset: omg-macos-arm64.tar.gz
+            deployment_target: "14.0"
+          - label: windows-amd64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin: omg.exe
+            asset: omg-windows-amd64.zip
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.release.outputs.version }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          target: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+        env:
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment_target || '' }}
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cp target/${{ matrix.target }}/release/${{ matrix.bin }} ${{ matrix.bin }}
+          tar czf ${{ matrix.asset }} ${{ matrix.bin }} README.md LICENSE
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Copy-Item "target\${{ matrix.target }}\release\${{ matrix.bin }}" "${{ matrix.bin }}"
+          Compress-Archive -Path "${{ matrix.bin }}", "README.md", "LICENSE" -DestinationPath "${{ matrix.asset }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.label }}
+          path: ${{ matrix.asset }}
+
+  github-release:
+    name: GitHub Release
+    needs: [ release, build-binaries ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.release.outputs.version }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: "*"
+          merge-multiple: true
+
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ needs.release.outputs.version }}" dist/* \
+            --title "v${{ needs.release.outputs.version }}" \
+            --generate-notes
+
+  update-homebrew-formula:
+    name: Update Homebrew Formula
+    needs: [ release, github-release ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-arm64
+          path: dist
+
+      - name: Compute SHA256
+        id: sha
+        run: |
+          SHA=$(sha256sum "dist/omg-macos-arm64.tar.gz" | awk '{print $1}')
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout tap repo
+        uses: actions/checkout@v4
+        with:
+          repository: Y-Square-T3/homebrew-oh-my-gocd
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Update formula
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          mkdir -p tap/Formula
+          cat > tap/Formula/omg.rb <<EOF
+          class Omg < Formula
+            desc "Rust Version of oh-my-gocd"
+            homepage "https://github.com/Y-Square-T3/oh-my-gocd"
+            version "${VERSION}"
+            url "https://github.com/Y-Square-T3/oh-my-gocd/releases/download/v${VERSION}/omg-macos-arm64.tar.gz"
+            sha256 "${SHA}"
+
+            def install
+              bin.install "omg"
+            end
+
+            test do
+              system "#{bin}/omg", "--version"
+            end
+          end
+          EOF
+
+      - name: Commit and push formula
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/omg.rb
+          git diff --cached --quiet || git commit -m "omg ${VERSION}"
+          git push
