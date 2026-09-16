@@ -1,7 +1,6 @@
 // The MCP service: tools live here, GoCD access behind the gocd::GocdApi trait.
 
-use crate::gocd::GocdApi;
-use crate::gocd::user::prune_identity;
+use crate::gocd::{GocdApi, GocdCall};
 use rmcp::{
     ServerHandler,
     handler::server::router::tool::ToolRouter,
@@ -26,12 +25,13 @@ impl OmgMcp {
     }
 
     #[tool(
-        description = "Get the GoCD user the configured token authenticates as. Returns JSON with login_name, display_name, enabled, email and checkin_aliases."
+        description = "Get the GoCD user the configured token authenticates as (GET /go/api/current_user, API v1). Returns the user JSON — login_name, display_name, enabled, email, checkin_aliases and any other documented fields — with `_links` removed and `_etag` included when GoCD sent one."
     )]
     async fn get_current_user(&self) -> CallToolResult {
-        match self.api.fetch_current_user().await {
-            Ok(user) => {
-                CallToolResult::success(vec![ContentBlock::text(prune_identity(&user).to_string())])
+        let call = GocdCall::get("api/current_user").version(1);
+        match self.api.request(call).await {
+            Ok(reply) => {
+                CallToolResult::success(vec![ContentBlock::text(reply.shaped().to_string())])
             }
             Err(err) => CallToolResult::error(vec![ContentBlock::text(err.tool_message())]),
         }
@@ -49,32 +49,44 @@ impl ServerHandler for OmgMcp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gocd::{GocdError, user::gocd_doc_example};
-    use serde_json::json;
+    use crate::gocd::{GocdCall, GocdError, GocdReply};
+    use serde_json::{Value, json};
     use std::future::Future;
     use std::pin::Pin;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     #[derive(Debug)]
     struct FakeGocd {
-        outcome: Result<serde_json::Value, String>,
+        calls: Mutex<Vec<GocdCall>>,
+        outcome: Result<GocdReply, GocdError>,
+    }
+
+    impl FakeGocd {
+        fn replies_with(reply: GocdReply) -> Arc<Self> {
+            Arc::new(Self {
+                calls: Mutex::new(Vec::new()),
+                outcome: Ok(reply),
+            })
+        }
     }
 
     impl crate::gocd::GocdApi for FakeGocd {
-        fn fetch_current_user(
+        fn request(
             &self,
-        ) -> Pin<Box<dyn Future<Output = Result<serde_json::Value, GocdError>> + Send + '_>>
-        {
-            let outcome = self.outcome.clone().map_err(|m| match m.as_str() {
-                "401" => GocdError::Http { status: 401 },
-                other => GocdError::Transport(other.to_owned()),
-            });
+            call: GocdCall,
+        ) -> Pin<Box<dyn Future<Output = Result<GocdReply, GocdError>> + Send + '_>> {
+            self.calls.lock().unwrap().push(call);
+            let outcome = self.outcome.clone();
             Box::pin(async move { outcome })
         }
     }
 
-    fn service(outcome: Result<serde_json::Value, String>) -> OmgMcp {
-        OmgMcp::new(Arc::new(FakeGocd { outcome }))
+    fn service(fake: Arc<FakeGocd>) -> OmgMcp {
+        OmgMcp::new(fake)
+    }
+
+    fn recorded(fake: &FakeGocd) -> Vec<GocdCall> {
+        fake.calls.lock().unwrap().clone()
     }
 
     fn first_text(result: &rmcp::model::CallToolResult) -> String {
@@ -85,25 +97,62 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn success_returns_pruned_identity_as_json() {
-        let result = service(Ok(gocd_doc_example())).get_current_user().await;
+    async fn get_current_user_sends_a_version_1_get_to_the_documented_path() {
+        let fake = FakeGocd::replies_with(GocdReply {
+            body: json!({}),
+            etag: None,
+        });
+        service(fake.clone()).get_current_user().await;
+
+        assert_eq!(
+            recorded(&fake),
+            vec![GocdCall::get("api/current_user").version(1)]
+        );
+    }
+
+    #[tokio::test]
+    async fn get_current_user_returns_the_body_shaped_by_the_unified_pattern() {
+        // Shape taken verbatim from the GoCD API docs' current-user example.
+        let fake = FakeGocd::replies_with(GocdReply {
+            body: json!({
+                "_links": {
+                    "doc": { "href": "https://api.gocd.org/#current-user" },
+                    "self": { "href": "https://ci.example.com/go/api/current_user" }
+                },
+                "login_name": "jdoe",
+                "display_name": "John Doe",
+                "enabled": true,
+                "email": null,
+                "email_me": false,
+                "checkin_aliases": ["jdoe"]
+            }),
+            etag: Some("\"deadbeef\"".into()),
+        });
+        let result = service(fake).get_current_user().await;
 
         assert_ne!(result.is_error, Some(true));
+        let shaped: Value = serde_json::from_str(&first_text(&result)).unwrap();
         assert_eq!(
-            serde_json::from_str::<serde_json::Value>(&first_text(&result)).unwrap(),
+            shaped,
             json!({
                 "login_name": "jdoe",
                 "display_name": "John Doe",
                 "enabled": true,
                 "email": null,
-                "checkin_aliases": ["jdoe"]
+                "email_me": false,
+                "checkin_aliases": ["jdoe"],
+                "_etag": "\"deadbeef\""
             })
         );
     }
 
     #[tokio::test]
     async fn unauthorized_gocd_call_becomes_a_tool_error_with_a_hint() {
-        let result = service(Err("401".into())).get_current_user().await;
+        let fake = Arc::new(FakeGocd {
+            calls: Mutex::new(Vec::new()),
+            outcome: Err(GocdError::Http { status: 401 }),
+        });
+        let result = service(fake).get_current_user().await;
 
         assert_eq!(result.is_error, Some(true));
         let text = first_text(&result);
@@ -114,7 +163,11 @@ mod tests {
     #[test]
     fn server_advertises_omg_with_the_crate_version() {
         use rmcp::ServerHandler;
-        let info = service(Ok(json!({}))).get_info();
+        let fake = FakeGocd::replies_with(GocdReply {
+            body: json!({}),
+            etag: None,
+        });
+        let info = service(fake).get_info();
         assert_eq!(info.server_info.name, "omg");
         assert_eq!(info.server_info.version, env!("CARGO_PKG_VERSION"));
         assert!(info.capabilities.tools.is_some());

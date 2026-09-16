@@ -1,18 +1,146 @@
-pub mod user;
-
 use anyhow::Context;
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
 use url::Url;
 
-/// The GoCD API surface omg consumes. A trait so the MCP tools can be tested
-/// with a fake instead of a live server.
+/// The GoCD API surface omg consumes: one generic transport call so adding an
+/// API section never multiplies trait methods or fake stubs. A trait so the
+/// MCP tools can be tested with a recording fake instead of a live server.
 pub trait GocdApi: Send + Sync + Debug {
-    fn fetch_current_user(
+    fn request(
         &self,
-    ) -> Pin<Box<dyn Future<Output = Result<Value, GocdError>> + Send + '_>>;
+        call: GocdCall,
+    ) -> Pin<Box<dyn Future<Output = Result<GocdReply, GocdError>> + Send + '_>>;
+}
+
+/// The HTTP verbs GoCD documents.
+// Constructed by the not-yet-landed write-section helpers; the transport
+// reads every variant today.
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GocdVerb {
+    Get,
+    Post,
+    Put,
+    Patch,
+    Delete,
+}
+
+/// One GoCD HTTP operation as documented in the API reference: the
+/// context-relative path, the documented accept version, and the optional
+/// query pairs, JSON body and If-Match ETag the endpoint defines.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GocdCall {
+    pub verb: GocdVerb,
+    pub path: String,
+    pub version: u32,
+    pub query: Vec<(String, String)>,
+    pub body: Option<Value>,
+    pub if_match: Option<String>,
+}
+
+impl GocdCall {
+    pub fn get(path: &str) -> Self {
+        Self::new(GocdVerb::Get, path)
+    }
+
+    // The write-side constructors and optional-part setters below are used by
+    // per-section helpers as those sections land.
+    #[allow(dead_code)]
+    pub fn post(path: &str) -> Self {
+        Self::new(GocdVerb::Post, path)
+    }
+
+    #[allow(dead_code)]
+    pub fn put(path: &str) -> Self {
+        Self::new(GocdVerb::Put, path)
+    }
+
+    #[allow(dead_code)]
+    pub fn patch(path: &str) -> Self {
+        Self::new(GocdVerb::Patch, path)
+    }
+
+    #[allow(dead_code)]
+    pub fn delete(path: &str) -> Self {
+        Self::new(GocdVerb::Delete, path)
+    }
+
+    fn new(verb: GocdVerb, path: &str) -> Self {
+        Self {
+            verb,
+            path: path.to_owned(),
+            version: 1,
+            query: Vec::new(),
+            body: None,
+            if_match: None,
+        }
+    }
+
+    /// Pin the `application/vnd.go.cd.vN+json` accept version.
+    pub fn version(mut self, version: u32) -> Self {
+        self.version = version;
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn query(mut self, pairs: Vec<(String, String)>) -> Self {
+        self.query = pairs;
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn body(mut self, body: Value) -> Self {
+        self.body = Some(body);
+        self
+    }
+
+    /// Send the ETag back as `If-Match`, GoCD's write guard.
+    #[allow(dead_code)]
+    pub fn etag(mut self, etag: String) -> Self {
+        self.if_match = Some(etag);
+        self
+    }
+}
+
+/// GoCD's answer: the JSON body plus the ETag header when one was sent.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GocdReply {
+    pub body: Value,
+    pub etag: Option<String>,
+}
+
+impl GocdReply {
+    /// The success body as every omg tool advertises it: all `_links` objects
+    /// recursively removed, and `_etag` injected only when GoCD sent an ETag
+    /// header. Everything else is kept verbatim.
+    pub fn shaped(&self) -> Value {
+        let mut body = self.body.clone();
+        strip_links(&mut body);
+        if let (Some(etag), Value::Object(map)) = (&self.etag, &mut body) {
+            map.entry("_etag").or_insert_with(|| json!(etag));
+        }
+        body
+    }
+}
+
+fn strip_links(value: &mut Value) {
+    match value {
+        Value::Object(map) => {
+            map.remove("_links");
+            for child in map.values_mut() {
+                strip_links(child);
+            }
+        }
+        Value::Array(items) => {
+            for child in items {
+                strip_links(child);
+            }
+        }
+        _ => {}
+    }
 }
 
 /// The live implementation: reqwest against a GoCD server.
@@ -45,16 +173,35 @@ impl HttpGocd {
 }
 
 impl GocdApi for HttpGocd {
-    fn fetch_current_user(
+    fn request(
         &self,
-    ) -> Pin<Box<dyn Future<Output = Result<Value, GocdError>> + Send + '_>> {
+        call: GocdCall,
+    ) -> Pin<Box<dyn Future<Output = Result<GocdReply, GocdError>> + Send + '_>> {
         Box::pin(async move {
-            let url = self.api_url("api/current_user");
-            let response = self
+            let url = self.api_url(&call.path);
+            let method = match call.verb {
+                GocdVerb::Get => reqwest::Method::GET,
+                GocdVerb::Post => reqwest::Method::POST,
+                GocdVerb::Put => reqwest::Method::PUT,
+                GocdVerb::Patch => reqwest::Method::PATCH,
+                GocdVerb::Delete => reqwest::Method::DELETE,
+            };
+            let mut request = self
                 .http
-                .get(url.clone())
+                .request(method, url.clone())
                 .bearer_auth(&self.token)
-                .header(reqwest::header::ACCEPT, "application/vnd.go.cd.v1+json")
+                .header(
+                    reqwest::header::ACCEPT,
+                    format!("application/vnd.go.cd.v{}+json", call.version),
+                )
+                .query(&call.query);
+            if let Some(body) = &call.body {
+                request = request.json(body);
+            }
+            if let Some(etag) = &call.if_match {
+                request = request.header(reqwest::header::IF_MATCH, etag);
+            }
+            let response = request
                 .send()
                 .await
                 .map_err(|err| GocdError::Transport(format!("{url}: {err}")))?;
@@ -64,16 +211,27 @@ impl GocdApi for HttpGocd {
                     status: status.as_u16(),
                 });
             }
-            response
-                .json::<Value>()
+            let etag = response
+                .headers()
+                .get(reqwest::header::ETAG)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_owned);
+            let text = response
+                .text()
                 .await
-                .map_err(|err| GocdError::Decode(err.to_string()))
+                .map_err(|err| GocdError::Decode(err.to_string()))?;
+            let body = if text.trim().is_empty() {
+                Value::Null
+            } else {
+                serde_json::from_str(&text).map_err(|err| GocdError::Decode(err.to_string()))?
+            };
+            Ok(GocdReply { body, etag })
         })
     }
 }
 
 /// Everything that can go wrong on the way to a GoCD answer.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum GocdError {
     /// GoCD answered with an unexpected status.
     Http { status: u16 },
@@ -97,6 +255,11 @@ impl GocdError {
             GocdError::Http { status: 404 } => concat!(
                 "GoCD answered 404 — check `omg config --endpoint`; ",
                 "GoCD also answers 404 for an unknown token"
+            )
+            .to_string(),
+            GocdError::Http { status: 412 } => concat!(
+                "GoCD rejected the write (412) — the resource changed since that ETag; ",
+                "re-read it and retry with the fresh `_etag`"
             )
             .to_string(),
             GocdError::Http { status } => format!("GoCD responded with HTTP {status}"),
@@ -220,5 +383,66 @@ mod tests {
     fn decode_error_reports_a_non_json_response() {
         let msg = GocdError::Decode("expected value".into()).tool_message();
         assert!(msg.contains("JSON"), "got: {msg}");
+    }
+
+    #[test]
+    fn precondition_failure_tells_the_caller_to_reread() {
+        let msg = GocdError::Http { status: 412 }.tool_message();
+        assert!(msg.contains("412"), "got: {msg}");
+        assert!(msg.contains("re-read"), "got: {msg}");
+        assert!(msg.contains("_etag"), "got: {msg}");
+    }
+
+    #[test]
+    fn shaping_strips_links_recursively_and_keeps_everything_else() {
+        let reply = GocdReply {
+            body: json!({
+                "_links": { "self": { "href": "x" } },
+                "name": "store",
+                "nested": [
+                    { "_links": {}, "keep": 1 },
+                    { "deeper": { "_links": { "doc": { "href": "y" } }, "v": 2 } }
+                ],
+                "_embedded": { "config_entries": [{ "_links": {}, "id": 7 }] }
+            }),
+            etag: None,
+        };
+        assert_eq!(
+            reply.shaped(),
+            json!({
+                "name": "store",
+                "nested": [ { "keep": 1 }, { "deeper": { "v": 2 } } ],
+                "_embedded": { "config_entries": [{ "id": 7 }] }
+            })
+        );
+    }
+
+    #[test]
+    fn shaping_surfaces_the_etag_header_only_when_go_cd_sent_one() {
+        let with_etag = GocdReply {
+            body: json!({ "name": "store" }),
+            etag: Some("\"abc\"".into()),
+        };
+        assert_eq!(
+            with_etag.shaped(),
+            json!({ "name": "store", "_etag": "\"abc\"" })
+        );
+
+        let without_etag = GocdReply {
+            body: json!({ "name": "store" }),
+            etag: None,
+        };
+        assert_eq!(without_etag.shaped(), json!({ "name": "store" }));
+    }
+
+    #[test]
+    fn call_builders_default_to_sending_nothing_optional() {
+        let call = GocdCall::get("api/current_user").version(1);
+        assert_eq!(call.verb, GocdVerb::Get);
+        assert_eq!(call.path, "api/current_user");
+        assert_eq!(call.version, 1);
+        assert!(call.query.is_empty());
+        assert_eq!(call.body, None);
+        assert_eq!(call.if_match, None);
     }
 }
