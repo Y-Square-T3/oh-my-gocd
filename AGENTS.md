@@ -16,6 +16,10 @@ Single-context layout with `CONTEXT.md` at root and `docs/adr/` for decisions. S
 
 Write all markdown you generate for this repo — specs, issues, task files, `CONTEXT.md`, ADRs, reports — in **English**. Code, commands, file paths, identifiers, and quoted error messages stay verbatim. This applies to new output only; don't translate existing docs.
 
+### Module layout
+
+Rust 2018+ paths; **no `mod.rs`**. A module with children is `src/<module>.rs` (declaring submodules) with the children in `src/<module>/` — e.g. `src/config.rs` + `src/config/command.rs`. Leaf modules are plain files (`src/cli.rs`).
+
 ### Test strategy
 
 **Discipline**: TDD. Write the failing test first, then make it pass.
