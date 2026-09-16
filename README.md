@@ -56,3 +56,43 @@ Notes:
   but comments are dropped. Remove a value by editing the file directly.
 - `omg config` with no flags prints help and exits with code 2;
   `--list` cannot be combined with `--token`/`--endpoint`.
+
+## MCP server
+
+omg can serve the [Model Context Protocol](https://modelcontextprotocol.io)
+over stdio:
+
+```sh
+omg server --mcp
+```
+
+The server authenticates against GoCD with the saved `server.endpoint` and
+`server.token`, and exits immediately at startup if either is missing (the
+error names the key and the `omg config` flag that sets it). It speaks
+JSON-RPC on stdin/stdout, so it is meant to be spawned by an MCP client
+rather than run by hand.
+
+Tools currently offered:
+
+- `get_current_user` — the GoCD user the token authenticates as, as JSON
+  (`login_name`, `display_name`, `enabled`, `email`, `checkin_aliases`).
+
+### opencode
+
+Add an `mcp` entry to your project's `opencode.json`, or to
+`~/.config/opencode/opencode.json` to make omg available everywhere:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "omg": {
+      "type": "local",
+      "command": ["omg", "server", "--mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+Restart opencode to load it; the running session keeps the old config.
