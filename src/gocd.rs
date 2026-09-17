@@ -2,6 +2,7 @@ pub mod agents;
 pub mod artifact_store;
 pub mod artifacts_config;
 pub mod authorization_config;
+pub mod backups;
 
 use anyhow::Context;
 use serde_json::{Value, json};

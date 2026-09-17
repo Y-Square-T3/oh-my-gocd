@@ -18,6 +18,7 @@ pub mod agents;
 pub mod artifact_store;
 pub mod artifacts_config;
 pub mod authorization_config;
+pub mod backups;
 
 #[derive(Debug, Clone)]
 pub struct OmgMcp {
@@ -33,6 +34,7 @@ impl OmgMcp {
         tool_router.merge(Self::artifact_store_tool_router());
         tool_router.merge(Self::artifacts_config_tool_router());
         tool_router.merge(Self::authorization_config_tool_router());
+        tool_router.merge(Self::backups_tool_router());
         Self { tool_router, api }
     }
 

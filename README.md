@@ -80,6 +80,11 @@ Tools currently offered:
 - `get_agent_job_run_history` — list jobs that have run on an agent, with optional `offset`/`page_size`/`sort_column`/`sort_order`.
 - `kill_agent_running_tasks` — kill all running tasks on an agent.
 
+**Backups**
+
+- `schedule_backup` — trigger an asynchronous backup of all configuration and the database.
+- `get_backup` — read one backup's status by id, or with the `backup_id` keyword `running`.
+
 ### opencode
 
 Add to your project's `opencode.json` (or `~/.config/opencode/opencode.json` to make it global):
