@@ -1,0 +1,142 @@
+# MCP Tools
+
+Tools currently offered by the omg MCP server. Each tool belongs to one of the
+security tiers described in the
+[Security modes](../README.md#security-modes) section of the README.
+
+**Current User**
+
+- `get_current_user` — the GoCD user the token authenticates as, as JSON.
+- `update_current_user` — update the token's own user from a JSON body (`email`/`email_me`/`checkin_aliases`; no `etag` needed — GoCD requires no If-Match here).
+
+**Artifact Store**
+
+- `get_artifact_stores` — list every configured pluggable artifact store.
+- `get_artifact_store` — read one artifact store by id (returns its `_etag`).
+- `create_artifact_store` — create an artifact store from a JSON body.
+- `update_artifact_store` — replace an artifact store, guarded by a required `etag` (the `_etag` you read).
+- `delete_artifact_store` — delete an artifact store by id.
+
+**Artifacts Config**
+
+- `get_artifacts_config` — read the server-wide artifacts dir and purge settings (returns its `_etag`).
+- `update_artifacts_config` — update the artifacts config, guarded by a required `etag` (the `_etag` you read).
+
+**Authorization Configuration**
+
+- `get_auth_configs` — list every configured authorization configuration.
+- `get_auth_config` — read one authorization configuration by id (returns its `_etag`).
+- `create_auth_config` — create an authorization configuration from a JSON body.
+- `update_auth_config` — replace an authorization configuration, guarded by a required `etag` (the `_etag` you read).
+- `delete_auth_config` — delete an authorization configuration by id.
+
+**Backup Config**
+
+- `get_backup_config` — read the server's backup config (schedule, post-backup script, failure/success emails).
+- `update_backup_config` — create or replace the backup config from a JSON body (the docs' POST+PUT pair, collapsed to PUT).
+- `delete_backup_config` — delete the backup config.
+
+**Access Tokens**
+
+- `get_current_user_access_tokens` — list the token's own user's access tokens (creation is deliberately not exposed).
+- `get_current_user_access_token` — read one of the user's own tokens by id.
+- `revoke_current_user_access_token` — revoke one of the user's own tokens from a JSON body (`{"revoke_cause": ...}`; no `etag` needed — GoCD requires no If-Match here).
+- `get_admin_access_tokens` — list all users' tokens (admin), with optional `filter` (`all`/`active`/`revoked`; unset sends no query).
+- `get_admin_access_token` — read any user's token by id (admin).
+- `revoke_admin_access_token` — revoke any user's token from a JSON body (`{"revoke_cause": ...}`; admin; no If-Match needed).
+
+**Agents**
+
+- `get_agents` — list all agents, registered and pending.
+- `get_agent` — read one agent by uuid.
+- `update_agent` — update one agent's attributes (hostname/resources/environments/config state) from a JSON body.
+- `delete_agent` — delete one agent by uuid.
+- `bulk_update_agents` — bulk update agents from a JSON body (`uuids` + `operations`).
+- `bulk_delete_agents` — bulk delete agents from a JSON body (`uuids`).
+- `get_agent_job_run_history` — list jobs that have run on an agent, with optional `offset`/`page_size`/`sort_column`/`sort_order`.
+- `kill_agent_running_tasks` — kill all running tasks on an agent.
+
+**Backups**
+
+- `schedule_backup` — trigger an asynchronous backup of all configuration and the database.
+- `get_backup` — read one backup's status by id, or with the `backup_id` keyword `running`.
+
+**Dashboard**
+
+- `get_dashboard` — the personalized dashboard: pipelines with their latest instances and stage status, pipeline groups and environments.
+
+**Encryption**
+
+- `encrypt_value` — get the cipher text for a plain text value from a JSON body (`{"value": ...}`); GoCD rate-limits this to 30 requests per minute.
+
+**Jobs**
+
+- `get_job_instance` — read one job instance (state, result, agent, state transitions) by pipeline/counter/stage/counter/job.
+- `get_job_history` — list a job's past instances, with optional `page_size`/`after`/`before` cursor pagination.
+
+**Maintenance Mode**
+
+- `get_maintenance_mode_info` — read the server maintenance mode state (on/off, who changed it and when, running systems and jobs).
+- `enable_maintenance_mode` — put the server into maintenance mode (the docs' action, sent per their curl example: body-less POST with GoCD's `X-GoCD-Confirm` header; GoCD answers 204, or 409 if already enabled).
+- `disable_maintenance_mode` — take the server out of maintenance mode (same body-less confirmed POST; 409 if not enabled).
+
+**Notify Materials**
+
+- `notify_svn_material` — schedule an SVN material's update from a JSON body (`repository_url` or `uuid`; no `etag` needed — GoCD requires no If-Match here).
+- `notify_git_material` — schedule a git material's update from a JSON body (`repository_url`).
+- `notify_hg_material` — schedule a Mercurial material's update from a JSON body (`repository_url`).
+- `notify_scm_material` — schedule a pluggable-SCM material's update from a JSON body (`scm_name`).
+
+**Pipeline Instances**
+
+- `get_pipeline_instance` — read one pipeline instance (build cause, stages and jobs) by pipeline name and counter.
+- `get_pipeline_history` — list a pipeline's past instances, with optional `page_size`/`after`/`before` cursor pagination.
+- `comment_pipeline_instance` — attach a comment (e.g. a failure reason) to a pipeline instance from a JSON body (`{"comment": ...}`).
+
+**Pipelines**
+
+- `get_pipeline_status` — read whether a pipeline is paused, locked and schedulable.
+- `pause_pipeline` — pause a pipeline from a JSON body (`{"pause_cause": ...}`; sent body-less with GoCD's documented `X-GoCD-Confirm` header when no body is given).
+- `unpause_pipeline` — unpause a pipeline (body-less POST, confirmed per the docs).
+- `unlock_pipeline` — release a pipeline lock (body-less POST, confirmed per the docs; only while locked with no running instance).
+- `schedule_pipeline` — trigger a new instance from an optional JSON body (`environment_variables`/`materials`/`update_materials_before_scheduling`).
+- `compare_pipeline_instances` — the material changes between two pipeline instances.
+
+**Plugin Info**
+
+- `get_all_plugin_info` — list every plugin installed on the server (id, status, about, extensions).
+- `get_plugin_info` — read one plugin's info by id.
+
+**Server Health**
+
+- `check_server_health` — whether the GoCD server is up and running (the health object, e.g. `{"health": "OK"}`).
+
+**Server Health Messages**
+
+- `get_server_health_messages` — the current server errors and warnings (message, detail, level, time), the same set the web UI shows in its errors-and-warnings modal.
+
+**Stage Instances**
+
+- `get_stage_instance` — read one stage instance (result, approval and its jobs with state transitions) by pipeline/counter/stage/counter.
+- `get_stage_history` — list a stage's past instances, with optional `page_size`/`after`/`before` cursor pagination.
+- `cancel_stage_instance` — cancel an active stage instance (body-less POST, confirmed per the docs).
+- `run_failed_stage_jobs` — rerun the failed jobs of a completed stage instance (body-less POST, confirmed per the docs).
+- `run_selected_stage_jobs` — rerun the named jobs of a completed stage instance from a JSON body (`{"jobs": [...]}`).
+
+**Stages**
+
+- `run_stage` — trigger a stage against an existing pipeline instance (body-less POST, confirmed per the docs; GoCD answers 202 with an acceptance message).
+
+**Users**
+
+- `get_users` — list all users.
+- `get_user` — read one user by login name (returns `_etag` when GoCD sends one).
+- `create_user` — create a user from a JSON body (`login_name` required; no If-Match needed — GoCD requires none here).
+- `update_user` — update one user's attributes (`enabled`/`email`/`email_me`/`checkin_aliases`) from a JSON body (no `etag` needed — GoCD requires no If-Match here).
+- `delete_user` — delete one user by login name (disable the user first; no `etag` needed — GoCD requires no If-Match here).
+- `bulk_delete_users` — bulk delete users from a JSON body (`users`).
+- `bulk_enable_disable_users` — enable or disable users from a JSON body (`users` + `operations.enable`).
+
+**Version**
+
+- `get_version` — the GoCD server version details (version, build number, git SHA, full version, commit URL).
