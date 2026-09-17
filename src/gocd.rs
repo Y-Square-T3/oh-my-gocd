@@ -9,6 +9,7 @@ pub mod current_user;
 pub mod dashboard;
 pub mod encryption;
 pub mod jobs;
+pub mod maintenance_mode;
 pub mod notify_materials;
 pub mod pipeline_instances;
 pub mod pipelines;

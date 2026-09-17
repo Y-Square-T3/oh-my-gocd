@@ -25,6 +25,7 @@ pub mod current_user;
 pub mod dashboard;
 pub mod encryption;
 pub mod jobs;
+pub mod maintenance_mode;
 pub mod notify_materials;
 pub mod pipeline_instances;
 pub mod pipelines;
@@ -57,6 +58,7 @@ impl OmgMcp {
         tool_router.merge(Self::dashboard_tool_router());
         tool_router.merge(Self::encryption_tool_router());
         tool_router.merge(Self::jobs_tool_router());
+        tool_router.merge(Self::maintenance_mode_tool_router());
         tool_router.merge(Self::notify_materials_tool_router());
         tool_router.merge(Self::pipeline_instances_tool_router());
         tool_router.merge(Self::pipelines_tool_router());

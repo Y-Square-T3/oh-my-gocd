@@ -114,6 +114,12 @@ Tools currently offered:
 - `get_job_instance` — read one job instance (state, result, agent, state transitions) by pipeline/counter/stage/counter/job.
 - `get_job_history` — list a job's past instances, with optional `page_size`/`after`/`before` cursor pagination.
 
+**Maintenance Mode**
+
+- `get_maintenance_mode_info` — read the server maintenance mode state (on/off, who changed it and when, running systems and jobs).
+- `enable_maintenance_mode` — put the server into maintenance mode (the docs' action, sent per their curl example: body-less POST with GoCD's `X-GoCD-Confirm` header; GoCD answers 204, or 409 if already enabled).
+- `disable_maintenance_mode` — take the server out of maintenance mode (same body-less confirmed POST; 409 if not enabled).
+
 **Notify Materials**
 
 - `notify_svn_material` — schedule an SVN material's update from a JSON body (`repository_url` or `uuid`; no `etag` needed — GoCD requires no If-Match here).
