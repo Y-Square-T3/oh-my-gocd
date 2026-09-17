@@ -48,7 +48,12 @@ try {
     Copy-Download -Source $archiveSource -Destination $archivePath
     Copy-Download -Source $checksumsSource -Destination $checksumsPath
 
-    $checksumLine = Get-Content $checksumsPath | Where-Object { $_ -match "^[a-fA-F0-9]{64}\s+\*?$([regex]::Escape($archiveName))$" } | Select-Object -First 1
+    $checksumLine = Get-Content $checksumsPath | Where-Object {
+        $parts = $_ -split '\s+', 2
+        $parts.Count -eq 2 -and
+            $parts[0] -match '^[a-fA-F0-9]{64}$' -and
+            [System.IO.Path]::GetFileName(($parts[1] -replace '^\*', '')) -eq $archiveName
+    } | Select-Object -First 1
     if (-not $checksumLine) {
         throw "SHA256SUMS does not contain $archiveName."
     }

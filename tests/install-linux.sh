@@ -24,10 +24,8 @@ EOF
 chmod +x "$package_dir/omg"
 
 tar -czf "$release_dir/omg-linux-amd64.tar.gz" -C "$package_dir" omg
-(
-  cd "$release_dir"
-  sha256sum omg-linux-amd64.tar.gz > SHA256SUMS
-)
+archive_hash=$(sha256sum "$release_dir/omg-linux-amd64.tar.gz" | awk '{ print $1 }')
+printf '%s  dist/omg-linux-amd64.tar.gz\n' "$archive_hash" > "$release_dir/SHA256SUMS"
 
 output=$(
   PATH="$fake_bin:$PATH" \

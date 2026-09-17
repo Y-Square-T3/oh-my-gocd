@@ -13,7 +13,7 @@ try {
     Compress-Archive -Path (Join-Path $packageDir "omg.exe") -DestinationPath (Join-Path $releaseDir "omg-windows-amd64.zip")
 
     $hash = (Get-FileHash -Algorithm SHA256 (Join-Path $releaseDir "omg-windows-amd64.zip")).Hash.ToLowerInvariant()
-    Set-Content -Path (Join-Path $releaseDir "SHA256SUMS") -Value "$hash  omg-windows-amd64.zip"
+    Set-Content -Path (Join-Path $releaseDir "SHA256SUMS") -Value "$hash  dist/omg-windows-amd64.zip"
 
     & "$PSScriptRoot/../install.ps1" -DownloadBaseUrl $releaseDir -InstallDir $installDir -SkipPathUpdate -SkipVersionCheck
     if (-not (Test-Path (Join-Path $installDir "omg.exe"))) {

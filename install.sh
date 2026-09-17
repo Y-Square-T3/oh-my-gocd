@@ -38,7 +38,17 @@ download() {
 download "$download_base_url/$archive_name" "$temp_dir/$archive_name"
 download "$download_base_url/SHA256SUMS" "$temp_dir/SHA256SUMS"
 
-expected_hash=$(awk -v name="$archive_name" '$2 == name || $2 == "*" name { print $1; exit }' "$temp_dir/SHA256SUMS")
+expected_hash=$(awk -v name="$archive_name" '
+  {
+    entry = $2
+    sub(/^\*/, "", entry)
+    sub(/^.*\//, "", entry)
+    if (entry == name) {
+      print $1
+      exit
+    }
+  }
+' "$temp_dir/SHA256SUMS")
 [ -n "$expected_hash" ] || fail "SHA256SUMS does not contain $archive_name"
 actual_hash=$(sha256sum "$temp_dir/$archive_name" | awk '{ print $1 }')
 [ "$actual_hash" = "$expected_hash" ] || fail "checksum verification failed for $archive_name"
