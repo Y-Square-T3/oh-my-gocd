@@ -1,5 +1,6 @@
 pub mod artifact_store;
 pub mod artifacts_config;
+pub mod authorization_config;
 
 use anyhow::Context;
 use serde_json::{Value, json};

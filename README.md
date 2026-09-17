@@ -61,6 +61,14 @@ Tools currently offered:
 - `get_artifacts_config` — read the server-wide artifacts dir and purge settings (returns its `_etag`).
 - `update_artifacts_config` — update the artifacts config, guarded by a required `etag` (the `_etag` you read).
 
+**Authorization Configuration**
+
+- `get_auth_configs` — list every configured authorization configuration.
+- `get_auth_config` — read one authorization configuration by id (returns its `_etag`).
+- `create_auth_config` — create an authorization configuration from a JSON body.
+- `update_auth_config` — replace an authorization configuration, guarded by a required `etag` (the `_etag` you read).
+- `delete_auth_config` — delete an authorization configuration by id.
+
 ### opencode
 
 Add to your project's `opencode.json` (or `~/.config/opencode/opencode.json` to make it global):
