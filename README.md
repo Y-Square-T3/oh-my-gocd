@@ -94,6 +94,11 @@ Tools currently offered:
 
 - `encrypt_value` — get the cipher text for a plain text value from a JSON body (`{"value": ...}`); GoCD rate-limits this to 30 requests per minute.
 
+**Jobs**
+
+- `get_job_instance` — read one job instance (state, result, agent, state transitions) by pipeline/counter/stage/counter/job.
+- `get_job_history` — list a job's past instances, with optional `page_size`/`after`/`before` cursor pagination.
+
 ### opencode
 
 Add to your project's `opencode.json` (or `~/.config/opencode/opencode.json` to make it global):
