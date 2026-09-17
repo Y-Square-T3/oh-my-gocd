@@ -9,6 +9,7 @@ pub mod encryption;
 pub mod jobs;
 pub mod pipeline_instances;
 pub mod pipelines;
+pub mod stage_instances;
 
 use anyhow::Context;
 use serde_json::{Value, json};

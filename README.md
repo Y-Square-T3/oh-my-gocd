@@ -114,6 +114,14 @@ Tools currently offered:
 - `schedule_pipeline` — trigger a new instance from an optional JSON body (`environment_variables`/`materials`/`update_materials_before_scheduling`).
 - `compare_pipeline_instances` — the material changes between two pipeline instances.
 
+**Stage Instances**
+
+- `get_stage_instance` — read one stage instance (result, approval and its jobs with state transitions) by pipeline/counter/stage/counter.
+- `get_stage_history` — list a stage's past instances, with optional `page_size`/`after`/`before` cursor pagination.
+- `cancel_stage_instance` — cancel an active stage instance (body-less POST, confirmed per the docs).
+- `run_failed_stage_jobs` — rerun the failed jobs of a completed stage instance (body-less POST, confirmed per the docs).
+- `run_selected_stage_jobs` — rerun the named jobs of a completed stage instance from a JSON body (`{"jobs": [...]}`).
+
 ### opencode
 
 Add to your project's `opencode.json` (or `~/.config/opencode/opencode.json` to make it global):
