@@ -9,6 +9,24 @@
 
 ## 安装
 
+### Linux（x86-64）
+
+```sh
+curl --proto '=https' --tlsv1.2 -fsSL https://github.com/Y-Square-T3/oh-my-gocd/releases/latest/download/install.sh | sh
+```
+
+无需安装 Rust 工具链。安装程序会校验发布文件、将 `omg` 安装到 `~/.local/bin`，并在需要时将该目录加入 shell 的 `PATH`。如果安装程序修改了 shell 配置，请重启终端。预编译程序需要兼容的、基于 glibc 的发行版；ARM64、Alpine/musl 或 glibc 版本较旧的系统请使用下方的 Cargo 安装方式。
+
+### Windows（x64）
+
+在 PowerShell 中运行：
+
+```powershell
+irm https://github.com/Y-Square-T3/oh-my-gocd/releases/latest/download/install.ps1 | iex
+```
+
+无需安装 Rust 工具链或 Visual Studio C++ Build Tools。安装程序会校验发布文件、将 `omg` 安装到 `%LOCALAPPDATA%\Programs\omg`，并加入用户 `PATH`。请重启已经打开的终端和 MCP 客户端。如果使用 WSL，请在 WSL 终端中运行 Linux 安装命令。
+
 ### Homebrew（macOS）
 
 ```sh
@@ -24,45 +42,7 @@ cargo install oh-my-gocd
 omg --version
 ```
 
-如果找不到 `omg` 命令，请确认 Cargo 的可执行文件目录已加入 `PATH`，然后重启终端：Linux/macOS 为 `~/.cargo/bin`，Windows 为 `%USERPROFILE%\.cargo\bin`。
-
-### Linux（x86-64）
-
-从[最新发布版本](https://github.com/Y-Square-T3/oh-my-gocd/releases/latest)下载预编译程序，无需安装 Rust。Linux 安装包的目标平台为 `x86_64-unknown-linux-gnu`，需要兼容的、基于 glibc 的发行版；它不是原生 ARM64 或 Alpine/musl 构建。对于其他受支持的目标平台，或系统 glibc 版本过旧的情况，请使用 Cargo 编译安装。
-
-在已安装 `curl` 和 `tar` 的 POSIX 兼容 shell 中运行：
-
-```sh
-omg_tmp_dir=$(mktemp -d)
-curl -fL https://github.com/Y-Square-T3/oh-my-gocd/releases/latest/download/omg-linux-amd64.tar.gz \
-  -o "$omg_tmp_dir/omg-linux-amd64.tar.gz" &&
-tar -xzf "$omg_tmp_dir/omg-linux-amd64.tar.gz" -C "$omg_tmp_dir" &&
-mkdir -p "$HOME/.local/bin" &&
-install -m 755 "$omg_tmp_dir/omg" "$HOME/.local/bin/omg"
-
-export PATH="$HOME/.local/bin:$PATH"
-omg --version
-```
-
-要在新终端中继续使用 `omg`，请将 `export PATH="$HOME/.local/bin:$PATH"` 添加到 shell 启动文件中（例如 Bash 的 `~/.bashrc` 或 Zsh 的 `~/.zshrc`）。升级时，重复下载和安装步骤即可。
-
-### Windows（x64）
-
-在 PowerShell 中下载并解压预编译程序。此安装方式无需安装 Rust 或 C++ Build Tools：
-
-```powershell
-$omgInstallDir = "$env:LOCALAPPDATA\Programs\omg"
-$omgArchive = "$env:TEMP\omg-windows-amd64.zip"
-Invoke-WebRequest -Uri "https://github.com/Y-Square-T3/oh-my-gocd/releases/latest/download/omg-windows-amd64.zip" -OutFile $omgArchive -ErrorAction Stop
-Expand-Archive -Path $omgArchive -DestinationPath $omgInstallDir -Force -ErrorAction Stop
-
-$env:Path = "$omgInstallDir;$env:Path"
-omg --version
-```
-
-以上 `PATH` 修改仅对当前 PowerShell 会话生效。要永久生效，请打开**编辑账户的环境变量**（Edit environment variables for your account），在**用户变量**（User variables）中编辑 **Path**，添加 `%LOCALAPPDATA%\Programs\omg`。重启终端及 MCP 客户端，使其读取新的路径。
-
-升级时，请先停止正在运行的 `omg` 进程（包括 MCP 服务器），再重复下载和解压步骤。如果使用 WSL，请在 WSL 终端中按照 Linux 安装指南操作。
+如果找不到 `omg` 命令，请确认 Cargo 的可执行文件目录已加入 `PATH`，然后重启终端：Linux/macOS 为 `~/.cargo/bin`，Windows 为 `%USERPROFILE%\.cargo\bin`。运行前，也可以在[最新发布版本](https://github.com/Y-Square-T3/oh-my-gocd/releases/latest)页面下载安装包并检查安装脚本。升级时重新运行所选的安装命令即可。
 
 ## 配置
 
