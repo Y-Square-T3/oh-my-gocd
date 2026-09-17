@@ -12,6 +12,7 @@ pub mod pipelines;
 pub mod stage_instances;
 pub mod stages;
 pub mod users;
+pub mod version;
 
 use anyhow::Context;
 use serde_json::{Value, json};

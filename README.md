@@ -136,6 +136,10 @@ Tools currently offered:
 - `bulk_delete_users` — bulk delete users from a JSON body (`users`).
 - `bulk_enable_disable_users` — enable or disable users from a JSON body (`users` + `operations.enable`).
 
+**Version**
+
+- `get_version` — the GoCD server version details (version, build number, git SHA, full version, commit URL).
+
 ### opencode
 
 Add to your project's `opencode.json` (or `~/.config/opencode/opencode.json` to make it global):

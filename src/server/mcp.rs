@@ -28,6 +28,7 @@ pub mod pipelines;
 pub mod stage_instances;
 pub mod stages;
 pub mod users;
+pub mod version;
 
 #[derive(Debug, Clone)]
 pub struct OmgMcp {
@@ -53,6 +54,7 @@ impl OmgMcp {
         tool_router.merge(Self::stage_instances_tool_router());
         tool_router.merge(Self::stages_tool_router());
         tool_router.merge(Self::users_tool_router());
+        tool_router.merge(Self::version_tool_router());
         Self { tool_router, api }
     }
 
