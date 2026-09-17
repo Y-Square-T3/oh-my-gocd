@@ -44,7 +44,17 @@ It authenticates with the saved `server.endpoint` and `server.token`, and fails 
 
 Tools currently offered:
 
+**Current User**
+
 - `get_current_user` — the GoCD user the token authenticates as, as JSON.
+
+**Artifact Store**
+
+- `get_artifact_stores` — list every configured pluggable artifact store.
+- `get_artifact_store` — read one artifact store by id (returns its `_etag`).
+- `create_artifact_store` — create an artifact store from a JSON body.
+- `update_artifact_store` — replace an artifact store, guarded by a required `etag` (the `_etag` you read).
+- `delete_artifact_store` — delete an artifact store by id.
 
 ### opencode
 

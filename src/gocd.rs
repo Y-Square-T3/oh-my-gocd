@@ -1,3 +1,5 @@
+pub mod artifact_store;
+
 use anyhow::Context;
 use serde_json::{Value, json};
 use std::fmt::Debug;
@@ -16,14 +18,13 @@ pub trait GocdApi: Send + Sync + Debug {
 }
 
 /// The HTTP verbs GoCD documents.
-// Constructed by the not-yet-landed write-section helpers; the transport
-// reads every variant today.
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GocdVerb {
     Get,
     Post,
     Put,
+    // Constructed once the first PATCH-only endpoint lands.
+    #[allow(dead_code)]
     Patch,
     Delete,
 }
@@ -46,24 +47,20 @@ impl GocdCall {
         Self::new(GocdVerb::Get, path)
     }
 
-    // The write-side constructors and optional-part setters below are used by
-    // per-section helpers as those sections land.
-    #[allow(dead_code)]
     pub fn post(path: &str) -> Self {
         Self::new(GocdVerb::Post, path)
     }
 
-    #[allow(dead_code)]
     pub fn put(path: &str) -> Self {
         Self::new(GocdVerb::Put, path)
     }
 
+    // Used by the first PATCH-only endpoint, still to land.
     #[allow(dead_code)]
     pub fn patch(path: &str) -> Self {
         Self::new(GocdVerb::Patch, path)
     }
 
-    #[allow(dead_code)]
     pub fn delete(path: &str) -> Self {
         Self::new(GocdVerb::Delete, path)
     }
@@ -85,20 +82,19 @@ impl GocdCall {
         self
     }
 
+    // Used by the first endpoint with documented query parameters.
     #[allow(dead_code)]
     pub fn query(mut self, pairs: Vec<(String, String)>) -> Self {
         self.query = pairs;
         self
     }
 
-    #[allow(dead_code)]
     pub fn body(mut self, body: Value) -> Self {
         self.body = Some(body);
         self
     }
 
     /// Send the ETag back as `If-Match`, GoCD's write guard.
-    #[allow(dead_code)]
     pub fn etag(mut self, etag: String) -> Self {
         self.if_match = Some(etag);
         self
