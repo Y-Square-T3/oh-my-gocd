@@ -47,6 +47,7 @@ Tools currently offered:
 **Current User**
 
 - `get_current_user` — the GoCD user the token authenticates as, as JSON.
+- `update_current_user` — update the token's own user from a JSON body (`email`/`email_me`/`checkin_aliases`; no `etag` needed — GoCD requires no If-Match here).
 
 **Artifact Store**
 
