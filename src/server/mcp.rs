@@ -23,6 +23,7 @@ pub mod current_user;
 pub mod dashboard;
 pub mod encryption;
 pub mod jobs;
+pub mod pipeline_instances;
 
 #[derive(Debug, Clone)]
 pub struct OmgMcp {
@@ -43,6 +44,7 @@ impl OmgMcp {
         tool_router.merge(Self::dashboard_tool_router());
         tool_router.merge(Self::encryption_tool_router());
         tool_router.merge(Self::jobs_tool_router());
+        tool_router.merge(Self::pipeline_instances_tool_router());
         Self { tool_router, api }
     }
 

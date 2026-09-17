@@ -99,6 +99,12 @@ Tools currently offered:
 - `get_job_instance` — read one job instance (state, result, agent, state transitions) by pipeline/counter/stage/counter/job.
 - `get_job_history` — list a job's past instances, with optional `page_size`/`after`/`before` cursor pagination.
 
+**Pipeline Instances**
+
+- `get_pipeline_instance` — read one pipeline instance (build cause, stages and jobs) by pipeline name and counter.
+- `get_pipeline_history` — list a pipeline's past instances, with optional `page_size`/`after`/`before` cursor pagination.
+- `comment_pipeline_instance` — attach a comment (e.g. a failure reason) to a pipeline instance from a JSON body (`{"comment": ...}`).
+
 ### opencode
 
 Add to your project's `opencode.json` (or `~/.config/opencode/opencode.json` to make it global):
