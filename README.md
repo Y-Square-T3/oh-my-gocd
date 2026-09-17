@@ -122,6 +122,10 @@ Tools currently offered:
 - `run_failed_stage_jobs` — rerun the failed jobs of a completed stage instance (body-less POST, confirmed per the docs).
 - `run_selected_stage_jobs` — rerun the named jobs of a completed stage instance from a JSON body (`{"jobs": [...]}`).
 
+**Stages**
+
+- `run_stage` — trigger a stage against an existing pipeline instance (body-less POST, confirmed per the docs; GoCD answers 202 with an acceptance message).
+
 ### opencode
 
 Add to your project's `opencode.json` (or `~/.config/opencode/opencode.json` to make it global):
