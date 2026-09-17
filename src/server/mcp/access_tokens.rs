@@ -13,14 +13,14 @@ use serde_json::Value;
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
-pub(crate) struct CurrentUserAccessTokenId {
+pub(crate) struct AccessTokenId {
     /// The numeric id of the access token, e.g. "42".
     pub token_id: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
-pub(crate) struct RevokeCurrentUserAccessToken {
+pub(crate) struct RevokeAccessToken {
     /// The numeric id of the access token, e.g. "42".
     pub token_id: String,
     /// The revoke request object: {"revoke_cause": "<text>"}.
@@ -33,22 +33,6 @@ pub(crate) struct AdminAccessTokensQuery {
     /// Which tokens to list: "all", "active" or "revoked". Unset means GoCD's
     /// default of active tokens only.
     pub filter: Option<String>,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
-pub(crate) struct AdminAccessTokenId {
-    /// The numeric id of the access token, e.g. "42".
-    pub token_id: String,
-}
-
-#[derive(Debug, Deserialize, JsonSchema)]
-#[schemars(crate = "rmcp::schemars")]
-pub(crate) struct RevokeAdminAccessToken {
-    /// The numeric id of the access token, e.g. "42".
-    pub token_id: String,
-    /// The revoke request object: {"revoke_cause": "<text>"}.
-    pub body: Value,
 }
 
 #[tool_router(router = access_tokens_tool_router, vis = "pub(crate)")]
@@ -66,7 +50,7 @@ impl OmgMcp {
     )]
     async fn get_current_user_access_token(
         &self,
-        Parameters(args): Parameters<CurrentUserAccessTokenId>,
+        Parameters(args): Parameters<AccessTokenId>,
     ) -> CallToolResult {
         self.request_shaped(access_tokens::current_user_read(&args.token_id))
             .await
@@ -77,7 +61,7 @@ impl OmgMcp {
     )]
     async fn revoke_current_user_access_token(
         &self,
-        Parameters(args): Parameters<RevokeCurrentUserAccessToken>,
+        Parameters(args): Parameters<RevokeAccessToken>,
     ) -> CallToolResult {
         self.request_shaped(access_tokens::current_user_revoke(
             &args.token_id,
@@ -105,7 +89,7 @@ impl OmgMcp {
     )]
     async fn get_admin_access_token(
         &self,
-        Parameters(args): Parameters<AdminAccessTokenId>,
+        Parameters(args): Parameters<AccessTokenId>,
     ) -> CallToolResult {
         self.request_shaped(access_tokens::admin_read(&args.token_id))
             .await
@@ -116,7 +100,7 @@ impl OmgMcp {
     )]
     async fn revoke_admin_access_token(
         &self,
-        Parameters(args): Parameters<RevokeAdminAccessToken>,
+        Parameters(args): Parameters<RevokeAccessToken>,
     ) -> CallToolResult {
         self.request_shaped(access_tokens::admin_revoke(&args.token_id, args.body))
             .await
@@ -234,6 +218,20 @@ mod tests {
         })
     }
 
+    fn shaped_current_user_revoked() -> Value {
+        json!({
+            "id": 42,
+            "description": "token was compromised",
+            "username": "username",
+            "revoked": true,
+            "revoke_cause": "foo",
+            "revoked_by": "jez",
+            "revoked_at": "2019-02-20T11:25:03Z",
+            "created_at": "2019-02-20T10:45:10Z",
+            "last_used_at": null
+        })
+    }
+
     // Admin list body taken verbatim from the docs'
     // get-all-tokens-for-all-users filter=all example.
     fn docs_admin_list_body() -> Value {
@@ -329,6 +327,55 @@ mod tests {
         })
     }
 
+    fn shaped_admin_token() -> Value {
+        json!({
+            "id": 42,
+            "description": "my first token",
+            "username": "username",
+            "revoked": false,
+            "revoke_cause": null,
+            "revoked_by": null,
+            "revoked_at": null,
+            "created_at": "2019-02-20T10:45:10Z",
+            "last_used_at": null
+        })
+    }
+
+    // Revoke reply taken verbatim from the docs' revoke-token-for-any-user
+    // example.
+    fn docs_admin_revoked_body() -> Value {
+        json!({
+            "_links": {
+                "self": { "href": "https://ci.example.com/go/api/admin/access_tokens/42" },
+                "doc": { "href": "https://api.gocd.org/19.2.0/#access-token" },
+                "find": { "href": "https://ci.example.com/go/api/admin/access_tokens/:id" }
+            },
+            "id": 42,
+            "description": "token was compromised",
+            "username": "username",
+            "revoked": true,
+            "revoke_cause": "foo",
+            "revoked_by": "jez",
+            "revoked_at": "2019-02-20T11:25:03Z",
+            "created_at": "2019-02-20T10:45:10Z",
+            "last_used_at": null
+        })
+    }
+
+    fn shaped_admin_revoked() -> Value {
+        json!({
+            "id": 42,
+            "description": "token was compromised",
+            "username": "username",
+            "revoked": true,
+            "revoke_cause": "foo",
+            "revoked_by": "jez",
+            "revoked_at": "2019-02-20T11:25:03Z",
+            "created_at": "2019-02-20T10:45:10Z",
+            "last_used_at": null
+        })
+    }
+
     #[tokio::test]
     async fn get_current_user_access_tokens_lists_through_a_version_1_get_and_shapes_the_answer() {
         let fake = FakeGocd::replies(docs_current_user_list_body(), None);
@@ -347,7 +394,7 @@ mod tests {
     async fn get_current_user_access_token_reads_by_id_and_injects_a_sent_etag() {
         let fake = FakeGocd::replies(docs_current_user_token_body(), Some("\"deadbeef\"".into()));
         let result = service(fake.clone())
-            .get_current_user_access_token(Parameters(super::CurrentUserAccessTokenId {
+            .get_current_user_access_token(Parameters(super::AccessTokenId {
                 token_id: "42".into(),
             }))
             .await;
@@ -365,7 +412,7 @@ mod tests {
     async fn get_current_user_access_token_keeps_the_body_free_of_etag_when_go_cd_sends_none() {
         let fake = FakeGocd::replies(docs_current_user_token_body(), None);
         let result = service(fake.clone())
-            .get_current_user_access_token(Parameters(super::CurrentUserAccessTokenId {
+            .get_current_user_access_token(Parameters(super::AccessTokenId {
                 token_id: "42".into(),
             }))
             .await;
@@ -380,7 +427,7 @@ mod tests {
         let body = json!({ "revoke_cause": "token was compromised" });
         let fake = FakeGocd::replies(docs_current_user_revoked_body(), None);
         let result = service(fake.clone())
-            .revoke_current_user_access_token(Parameters(super::RevokeCurrentUserAccessToken {
+            .revoke_current_user_access_token(Parameters(super::RevokeAccessToken {
                 token_id: "42".into(),
                 body: body.clone(),
             }))
@@ -396,8 +443,7 @@ mod tests {
         );
         assert_ne!(result.is_error, Some(true));
         let shaped: Value = serde_json::from_str(&first_text(&result)).unwrap();
-        assert_eq!(shaped.get("_links"), None);
-        assert_eq!(shaped["revoked"], json!(true));
+        assert_eq!(shaped, shaped_current_user_revoked());
     }
 
     #[tokio::test]
@@ -440,7 +486,7 @@ mod tests {
     async fn get_admin_access_token_reads_any_users_token_by_id() {
         let fake = FakeGocd::replies(docs_admin_token_body(), None);
         let result = service(fake.clone())
-            .get_admin_access_token(Parameters(super::AdminAccessTokenId {
+            .get_admin_access_token(Parameters(super::AccessTokenId {
                 token_id: "42".into(),
             }))
             .await;
@@ -451,16 +497,15 @@ mod tests {
         );
         assert_ne!(result.is_error, Some(true));
         let shaped: Value = serde_json::from_str(&first_text(&result)).unwrap();
-        assert_eq!(shaped.get("_links"), None);
-        assert_eq!(shaped["id"], json!(42));
+        assert_eq!(shaped, shaped_admin_token());
     }
 
     #[tokio::test]
     async fn revoke_admin_access_token_posts_the_cause_body_to_the_revoke_path() {
         let body = json!({ "revoke_cause": "token was compromised" });
-        let fake = FakeGocd::replies(docs_current_user_revoked_body(), None);
+        let fake = FakeGocd::replies(docs_admin_revoked_body(), None);
         let result = service(fake.clone())
-            .revoke_admin_access_token(Parameters(super::RevokeAdminAccessToken {
+            .revoke_admin_access_token(Parameters(super::RevokeAccessToken {
                 token_id: "42".into(),
                 body: body.clone(),
             }))
@@ -475,7 +520,8 @@ mod tests {
             ]
         );
         assert_ne!(result.is_error, Some(true));
-        assert!(first_text(&result).contains("revoked"));
+        let shaped: Value = serde_json::from_str(&first_text(&result)).unwrap();
+        assert_eq!(shaped, shaped_admin_revoked());
     }
 
     #[tokio::test]
