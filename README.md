@@ -105,6 +105,15 @@ Tools currently offered:
 - `get_pipeline_history` — list a pipeline's past instances, with optional `page_size`/`after`/`before` cursor pagination.
 - `comment_pipeline_instance` — attach a comment (e.g. a failure reason) to a pipeline instance from a JSON body (`{"comment": ...}`).
 
+**Pipelines**
+
+- `get_pipeline_status` — read whether a pipeline is paused, locked and schedulable.
+- `pause_pipeline` — pause a pipeline from a JSON body (`{"pause_cause": ...}`; sent body-less with GoCD's documented `X-GoCD-Confirm` header when no body is given).
+- `unpause_pipeline` — unpause a pipeline (body-less POST, confirmed per the docs).
+- `unlock_pipeline` — release a pipeline lock (body-less POST, confirmed per the docs; only while locked with no running instance).
+- `schedule_pipeline` — trigger a new instance from an optional JSON body (`environment_variables`/`materials`/`update_materials_before_scheduling`).
+- `compare_pipeline_instances` — the material changes between two pipeline instances.
+
 ### opencode
 
 Add to your project's `opencode.json` (or `~/.config/opencode/opencode.json` to make it global):

@@ -8,6 +8,7 @@ pub mod dashboard;
 pub mod encryption;
 pub mod jobs;
 pub mod pipeline_instances;
+pub mod pipelines;
 
 use anyhow::Context;
 use serde_json::{Value, json};
@@ -38,7 +39,8 @@ pub enum GocdVerb {
 
 /// One GoCD HTTP operation as documented in the API reference: the
 /// context-relative path, the documented accept version, and the optional
-/// query pairs, JSON body and If-Match ETag the endpoint defines.
+/// query pairs, JSON body, If-Match ETag and X-GoCD-Confirm header the
+/// endpoint defines.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GocdCall {
     pub verb: GocdVerb,
@@ -47,6 +49,7 @@ pub struct GocdCall {
     pub query: Vec<(String, String)>,
     pub body: Option<Value>,
     pub if_match: Option<String>,
+    pub confirm: bool,
 }
 
 impl GocdCall {
@@ -78,6 +81,7 @@ impl GocdCall {
             query: Vec::new(),
             body: None,
             if_match: None,
+            confirm: false,
         }
     }
 
@@ -100,6 +104,13 @@ impl GocdCall {
     /// Send the ETag back as `If-Match`, GoCD's write guard.
     pub fn etag(mut self, etag: String) -> Self {
         self.if_match = Some(etag);
+        self
+    }
+
+    /// Send `X-GoCD-Confirm: true`, the confirmation header GoCD documents
+    /// for POSTs it shows without a request body.
+    pub fn confirm(mut self) -> Self {
+        self.confirm = true;
         self
     }
 }
@@ -199,6 +210,9 @@ impl GocdApi for HttpGocd {
             }
             if let Some(etag) = &call.if_match {
                 request = request.header(reqwest::header::IF_MATCH, etag);
+            }
+            if call.confirm {
+                request = request.header("x-gocd-confirm", "true");
             }
             let response = request
                 .send()
@@ -443,5 +457,12 @@ mod tests {
         assert!(call.query.is_empty());
         assert_eq!(call.body, None);
         assert_eq!(call.if_match, None);
+        assert!(!call.confirm);
+    }
+
+    #[test]
+    fn the_confirm_builder_pins_the_bodyless_write_confirmation() {
+        let call = GocdCall::post("api/pipelines/pipeline1/unpause").confirm();
+        assert!(call.confirm);
     }
 }
