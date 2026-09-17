@@ -1,3 +1,4 @@
+pub mod agents;
 pub mod artifact_store;
 pub mod artifacts_config;
 pub mod authorization_config;
@@ -25,8 +26,6 @@ pub enum GocdVerb {
     Get,
     Post,
     Put,
-    // Constructed once the first PATCH-only endpoint lands.
-    #[allow(dead_code)]
     Patch,
     Delete,
 }
@@ -57,8 +56,6 @@ impl GocdCall {
         Self::new(GocdVerb::Put, path)
     }
 
-    // Used by the first PATCH-only endpoint, still to land.
-    #[allow(dead_code)]
     pub fn patch(path: &str) -> Self {
         Self::new(GocdVerb::Patch, path)
     }
@@ -84,8 +81,6 @@ impl GocdCall {
         self
     }
 
-    // Used by the first endpoint with documented query parameters.
-    #[allow(dead_code)]
     pub fn query(mut self, pairs: Vec<(String, String)>) -> Self {
         self.query = pairs;
         self

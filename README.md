@@ -69,6 +69,17 @@ Tools currently offered:
 - `update_auth_config` — replace an authorization configuration, guarded by a required `etag` (the `_etag` you read).
 - `delete_auth_config` — delete an authorization configuration by id.
 
+**Agents**
+
+- `get_agents` — list all agents, registered and pending.
+- `get_agent` — read one agent by uuid.
+- `update_agent` — update one agent's attributes (hostname/resources/environments/config state) from a JSON body.
+- `delete_agent` — delete one agent by uuid.
+- `bulk_update_agents` — bulk update agents from a JSON body (`uuids` + `operations`).
+- `bulk_delete_agents` — bulk delete agents from a JSON body (`uuids`).
+- `get_agent_job_run_history` — list jobs that have run on an agent, with optional `offset`/`page_size`/`sort_column`/`sort_order`.
+- `kill_agent_running_tasks` — kill all running tasks on an agent.
+
 ### opencode
 
 Add to your project's `opencode.json` (or `~/.config/opencode/opencode.json` to make it global):
