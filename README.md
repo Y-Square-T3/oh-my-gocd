@@ -5,6 +5,8 @@
 
 # oh-my-gocd
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 ## Installation
 
 ### Homebrew (macOS)
@@ -15,9 +17,52 @@ brew install Y-Square-T3/homebrew-oh-my-gocd/omg
 
 ### Cargo (all platforms)
 
+Install the latest stable Rust toolchain using [rustup](https://rust-lang.org/tools/install/) first. On Windows, install the Visual Studio C++ Build Tools when prompted. On Linux, a C compiler and linker are required (for example, `build-essential` on Debian/Ubuntu).
+
 ```sh
 cargo install oh-my-gocd
+omg --version
 ```
+
+If `omg` is not found, ensure Cargo's binary directory is on your `PATH`: `~/.cargo/bin` on Linux/macOS or `%USERPROFILE%\.cargo\bin` on Windows, then restart your terminal.
+
+### Linux (x86-64)
+
+Download the prebuilt binary from the [latest release](https://github.com/Y-Square-T3/oh-my-gocd/releases/latest). Rust is not required. The Linux archive targets `x86_64-unknown-linux-gnu` and requires a compatible glibc-based distribution; it is not a native ARM64 or Alpine/musl build. Use Cargo to build for other supported targets or if your system's glibc is too old.
+
+Run in a POSIX-compatible shell with `curl` and `tar` installed:
+
+```sh
+omg_tmp_dir=$(mktemp -d)
+curl -fL https://github.com/Y-Square-T3/oh-my-gocd/releases/latest/download/omg-linux-amd64.tar.gz \
+  -o "$omg_tmp_dir/omg-linux-amd64.tar.gz" &&
+tar -xzf "$omg_tmp_dir/omg-linux-amd64.tar.gz" -C "$omg_tmp_dir" &&
+mkdir -p "$HOME/.local/bin" &&
+install -m 755 "$omg_tmp_dir/omg" "$HOME/.local/bin/omg"
+
+export PATH="$HOME/.local/bin:$PATH"
+omg --version
+```
+
+To keep `omg` available in new terminals, add `export PATH="$HOME/.local/bin:$PATH"` to your shell startup file (for example, `~/.bashrc` for Bash or `~/.zshrc` for Zsh). Repeat the download and install steps to upgrade.
+
+### Windows (x64)
+
+Download and extract the prebuilt binary in PowerShell. Rust and C++ Build Tools are not required for this installation method:
+
+```powershell
+$omgInstallDir = "$env:LOCALAPPDATA\Programs\omg"
+$omgArchive = "$env:TEMP\omg-windows-amd64.zip"
+Invoke-WebRequest -Uri "https://github.com/Y-Square-T3/oh-my-gocd/releases/latest/download/omg-windows-amd64.zip" -OutFile $omgArchive -ErrorAction Stop
+Expand-Archive -Path $omgArchive -DestinationPath $omgInstallDir -Force -ErrorAction Stop
+
+$env:Path = "$omgInstallDir;$env:Path"
+omg --version
+```
+
+The `PATH` change above applies to the current PowerShell session. To make it permanent, open **Edit environment variables for your account**, edit **Path** under **User variables**, and add `%LOCALAPPDATA%\Programs\omg`. Restart your terminal and any MCP client so they pick up the new path.
+
+To upgrade, stop running `omg` processes (including MCP servers), then repeat the download and extraction steps. For WSL, follow the Linux instructions inside your WSL terminal.
 
 ## Configuration
 
