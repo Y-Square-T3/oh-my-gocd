@@ -125,22 +125,78 @@ mod tests {
         })
     }
 
-    fn expected_shaped_list() -> Value {
-        let mut shaped = docs_plugin_info_list_body();
-        shaped.as_object_mut().unwrap().remove("_links");
-        shaped["_embedded"]["plugin_info"][0]
-            .as_object_mut()
-            .unwrap()
-            .remove("_links");
-        shaped["_etag"] = json!("\"3924a894cf0e5bef02abe9de0df3bb84\"");
-        shaped
+    // The docs list example with every `_links` dropped and `_etag` injected.
+    fn shaped_plugin_info_list() -> Value {
+        json!({
+          "_etag": "\"3924a894cf0e5bef02abe9de0df3bb84\"",
+          "_embedded": {
+            "plugin_info": [
+              {
+                "id": "json.config.plugin",
+                "status": { "state": "active" },
+                "plugin_file_location": "/Users/varshavs/gocd/server/plugins/bundled/gocd-json-config-plugin.jar",
+                "bundled_plugin": true,
+                "about": {
+                  "name": "JSON Configuration Plugin",
+                  "version": "0.2",
+                  "target_go_version": "16.1.0",
+                  "description": "Configuration plugin that supports GoCD configuration in JSON",
+                  "target_operating_systems": [],
+                  "vendor": {
+                    "name": "Tomasz Setkowski",
+                    "url": "https://github.com/tomzo/gocd-json-config-plugin"
+                  }
+                },
+                "extensions": [
+                  {
+                    "type": "configrepo",
+                    "plugin_settings": {
+                      "configurations": [
+                        { "key": "pipeline_pattern", "metadata": { "secure": false, "required": false } },
+                        { "key": "environment_pattern", "metadata": { "secure": false, "required": false } }
+                      ],
+                      "view": { "template": "Some view" }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        })
     }
 
-    fn expected_shaped_one() -> Value {
-        let mut shaped = docs_plugin_info_body();
-        shaped.as_object_mut().unwrap().remove("_links");
-        shaped["_etag"] = json!("\"4167e3ec81fdac0fb29d854b36ceb981\"");
-        shaped
+    // The docs get-one example with its `_links` dropped and `_etag` injected.
+    fn shaped_plugin_info() -> Value {
+        json!({
+          "_etag": "\"4167e3ec81fdac0fb29d854b36ceb981\"",
+          "id": "my_plugin",
+          "status": { "state": "active" },
+          "plugin_file_location": "/path/to/server/plugins/external/my_plugin.jar",
+          "bundled_plugin": false,
+          "about": {
+            "name": "My Plugin",
+            "version": "0.2",
+            "target_go_version": "16.1.0",
+            "description": "Short desc",
+            "target_operating_systems": [],
+            "vendor": {
+              "name": "GoCD contributors",
+              "url": "https://github.com/tomzo/gocd-json-config-plugin"
+            }
+          },
+          "extensions": [
+            {
+              "type": "configrepo",
+              "plugin_settings": {
+                "configurations": [
+                  { "key": "pipeline_pattern", "metadata": { "secure": false, "required": false } },
+                  { "key": "environment_pattern", "metadata": { "secure": false, "required": false } }
+                ],
+                "view": { "template": "Some view" }
+              }
+            }
+          ]
+        })
     }
 
     #[tokio::test]
@@ -157,7 +213,7 @@ mod tests {
         );
         assert_ne!(result.is_error, Some(true));
         let shaped: Value = serde_json::from_str(&first_text(&result)).unwrap();
-        assert_eq!(shaped, expected_shaped_list());
+        assert_eq!(shaped, shaped_plugin_info_list());
     }
 
     #[tokio::test]
@@ -178,7 +234,7 @@ mod tests {
         );
         assert_ne!(result.is_error, Some(true));
         let shaped: Value = serde_json::from_str(&first_text(&result)).unwrap();
-        assert_eq!(shaped, expected_shaped_one());
+        assert_eq!(shaped, shaped_plugin_info());
     }
 
     #[tokio::test]
