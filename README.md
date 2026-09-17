@@ -114,6 +114,13 @@ Tools currently offered:
 - `get_job_instance` — read one job instance (state, result, agent, state transitions) by pipeline/counter/stage/counter/job.
 - `get_job_history` — list a job's past instances, with optional `page_size`/`after`/`before` cursor pagination.
 
+**Notify Materials**
+
+- `notify_svn_material` — schedule an SVN material's update from a JSON body (`repository_url` or `uuid`; no `etag` needed — GoCD requires no If-Match here).
+- `notify_git_material` — schedule a git material's update from a JSON body (`repository_url`).
+- `notify_hg_material` — schedule a Mercurial material's update from a JSON body (`repository_url`).
+- `notify_scm_material` — schedule a pluggable-SCM material's update from a JSON body (`scm_name`).
+
 **Pipeline Instances**
 
 - `get_pipeline_instance` — read one pipeline instance (build cause, stages and jobs) by pipeline name and counter.
