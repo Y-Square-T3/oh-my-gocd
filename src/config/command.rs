@@ -1,7 +1,7 @@
 use crate::cli::ConfigArgs;
-use crate::config::{self, config_file_path};
+use crate::config::{self, Mode, config_file_path};
 use std::io::{BufRead, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Everything the config command touches outside its own logic: injected per test.
 pub struct Ctx<'a> {
@@ -55,6 +55,27 @@ fn normalize_endpoint(raw: &str) -> anyhow::Result<String> {
         .to_owned())
 }
 
+/// A string setting omg can save, together with the file section that owns it.
+enum Setting {
+    Server(&'static str),
+    Mcp(&'static str),
+}
+
+impl Setting {
+    fn key(&self) -> &str {
+        match self {
+            Setting::Server(key) | Setting::Mcp(key) => key,
+        }
+    }
+
+    fn write(&self, dir: &Path, value: &str) -> anyhow::Result<()> {
+        match self {
+            Setting::Server(key) => config::set_server_value(dir, key, value),
+            Setting::Mcp(key) => config::set_mcp_value(dir, key, value),
+        }
+    }
+}
+
 pub fn run(args: &ConfigArgs, ctx: &mut Ctx) -> anyhow::Result<()> {
     let path = config_file_path(&ctx.dir);
     if args.list {
@@ -70,26 +91,34 @@ pub fn run(args: &ConfigArgs, ctx: &mut Ctx) -> anyhow::Result<()> {
             "token: {}",
             cfg.server.token.as_deref().unwrap_or("<unset>")
         )?;
+        match cfg.mcp.mode {
+            Some(mode) => writeln!(ctx.stdout, "mode: {mode}")?,
+            None => writeln!(ctx.stdout, "mode: <unset> (default: {})", Mode::default())?,
+        }
         return Ok(());
     }
 
     // Read and validate every input first: a rejection must leave the file untouched.
-    let mut writes: Vec<(&str, String)> = Vec::new();
+    let mut writes: Vec<(Setting, String)> = Vec::new();
     if let Some(raw) = &args.token {
         let token = resolve_input(raw, &mut *ctx.stdin)?;
         if token.trim().is_empty() {
             anyhow::bail!("token must not be empty");
         }
-        writes.push(("token", token));
+        writes.push((Setting::Server("token"), token));
     }
     if let Some(raw) = &args.endpoint {
         let input = resolve_input(raw, &mut *ctx.stdin)?;
-        writes.push(("endpoint", normalize_endpoint(&input)?));
+        writes.push((Setting::Server("endpoint"), normalize_endpoint(&input)?));
+    }
+    if let Some(raw) = &args.mode {
+        let mode: Mode = raw.parse()?;
+        writes.push((Setting::Mcp("mode"), mode.to_string()));
     }
 
-    for (key, value) in &writes {
-        config::set_server_value(&ctx.dir, key, value)?;
-        writeln!(ctx.stdout, "{key} saved to {}", path.display())?;
+    for (setting, value) in &writes {
+        setting.write(&ctx.dir, value)?;
+        writeln!(ctx.stdout, "{} saved to {}", setting.key(), path.display())?;
     }
     Ok(())
 }
@@ -105,7 +134,15 @@ mod tests {
         ConfigArgs {
             token: token.map(str::to_owned),
             endpoint: endpoint.map(str::to_owned),
+            mode: None,
             list,
+        }
+    }
+
+    fn mode_args(mode: Option<&str>) -> ConfigArgs {
+        ConfigArgs {
+            mode: mode.map(str::to_owned),
+            ..args(None, None, false)
         }
     }
 
@@ -429,7 +466,7 @@ mod tests {
         assert_eq!(
             out,
             format!(
-                "config file: {}\nendpoint: <unset>\ntoken: <unset>\n",
+                "config file: {}\nendpoint: <unset>\ntoken: <unset>\nmode: <unset> (default: view)\n",
                 config_file_path(tmp.path()).display()
             )
         );
@@ -450,7 +487,7 @@ mod tests {
         assert_eq!(
             out,
             format!(
-                "config file: {}\nendpoint: https://gocd.example.com\ntoken: s3cr3t\n",
+                "config file: {}\nendpoint: https://gocd.example.com\ntoken: s3cr3t\nmode: <unset> (default: view)\n",
                 config_file_path(tmp.path()).display()
             )
         );
@@ -465,6 +502,100 @@ mod tests {
             String::from_utf8(invoke(tmp.path(), "", &args(None, None, true)).unwrap()).unwrap();
         assert!(out.contains("endpoint: <unset>\n"));
         assert!(out.contains("token: onlytoken\n"));
+    }
+
+    #[test]
+    fn setting_mode_stores_it_under_the_mcp_section() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let out = String::from_utf8(invoke(tmp.path(), "", &mode_args(Some("operate"))).unwrap())
+            .unwrap();
+
+        assert_eq!(saved(tmp.path()), json!({ "mcp": { "mode": "operate" } }));
+        assert!(out.starts_with("mode saved to "), "got: {out}");
+    }
+
+    #[test]
+    fn setting_mode_canonicalizes_and_is_accepted_in_all_three_values() {
+        for mode in ["view", "operate", "full"] {
+            let tmp = tempfile::TempDir::new().unwrap();
+            invoke(tmp.path(), "", &mode_args(Some(mode))).unwrap();
+            assert_eq!(saved(tmp.path())["mcp"]["mode"], json!(mode));
+        }
+    }
+
+    #[test]
+    fn unknown_mode_is_rejected_naming_the_allowed_values_and_writes_nothing() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let err = invoke(tmp.path(), "", &mode_args(Some("veiw"))).unwrap_err();
+        let msg = err.to_string();
+        for expected in ["veiw", "view", "operate", "full"] {
+            assert!(
+                msg.contains(expected),
+                "error should mention {expected}: {msg}"
+            );
+        }
+        assert!(!config_file_path(tmp.path()).exists());
+    }
+
+    #[test]
+    fn mode_alias_view_only_is_rejected() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let err = invoke(tmp.path(), "", &mode_args(Some("view-only"))).unwrap_err();
+        assert!(err.to_string().contains("view"), "got: {err}");
+        assert!(!config_file_path(tmp.path()).exists());
+    }
+
+    #[test]
+    fn setting_mode_and_token_together_writes_both_sections() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let out = String::from_utf8(
+            invoke(
+                tmp.path(),
+                "",
+                &ConfigArgs {
+                    token: Some("abc".into()),
+                    mode: Some("full".into()),
+                    ..args(None, None, false)
+                },
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        let lines: Vec<&str> = out.lines().collect();
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].starts_with("token saved to "));
+        assert!(lines[1].starts_with("mode saved to "));
+        assert_eq!(
+            saved(tmp.path()),
+            json!({ "server": { "token": "abc" }, "mcp": { "mode": "full" } })
+        );
+    }
+
+    #[test]
+    fn list_shows_unset_mode_with_its_effective_default() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let out =
+            String::from_utf8(invoke(tmp.path(), "", &args(None, None, true)).unwrap()).unwrap();
+
+        assert_eq!(
+            out,
+            format!(
+                "config file: {}\nendpoint: <unset>\ntoken: <unset>\nmode: <unset> (default: view)\n",
+                config_file_path(tmp.path()).display()
+            )
+        );
+    }
+
+    #[test]
+    fn list_shows_the_saved_mode_verbatim() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        invoke(tmp.path(), "", &mode_args(Some("operate"))).unwrap();
+
+        let out =
+            String::from_utf8(invoke(tmp.path(), "", &args(None, None, true)).unwrap()).unwrap();
+        assert!(out.contains("mode: operate\n"), "got: {out}");
+        assert!(!out.contains("<unset> (default"), "got: {out}");
     }
 
     #[test]

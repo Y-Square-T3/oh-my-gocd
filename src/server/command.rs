@@ -15,7 +15,9 @@ pub async fn run(args: &ServerArgs, dir: &Path) -> anyhow::Result<()> {
     let config = Config::load(dir)?;
     let (endpoint, token) = resolve_server_settings(&config)?;
     let api = Arc::new(HttpGocd::new(&endpoint, &token)?);
-    let service = OmgMcp::new(api)
+    // Unset means the safe tier; an unrecognized stored value already failed
+    // in Config::load before anything was served.
+    let service = OmgMcp::new(api, config.mcp.mode.unwrap_or_default())
         .serve(stdio())
         .await
         .map_err(|err| anyhow::anyhow!("cannot start MCP server: {err}"))?;
@@ -60,6 +62,7 @@ mod tests {
                 endpoint: endpoint.map(str::to_owned),
                 token: token.map(str::to_owned),
             },
+            mcp: Default::default(),
         }
     }
 

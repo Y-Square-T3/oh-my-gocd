@@ -46,8 +46,14 @@ impl GocdApi for FakeGocd {
     }
 }
 
+// Tests that call tool methods directly or inspect the whole merged router
+// use the full mode; mode-filtered exposure is tested explicitly.
 pub(crate) fn service(fake: Arc<FakeGocd>) -> super::OmgMcp {
-    super::OmgMcp::new(fake)
+    service_in(fake, crate::config::Mode::Full)
+}
+
+pub(crate) fn service_in(fake: Arc<FakeGocd>, mode: crate::config::Mode) -> super::OmgMcp {
+    super::OmgMcp::new(fake, mode)
 }
 
 pub(crate) fn first_text(result: &CallToolResult) -> String {

@@ -35,8 +35,12 @@ pub struct ConfigArgs {
     #[arg(short = 'E', long, value_name = "ENDPOINT")]
     pub endpoint: Option<String>,
 
+    /// MCP exposure mode: view, operate or full.
+    #[arg(long, value_name = "MODE")]
+    pub mode: Option<String>,
+
     /// Print the saved configuration.
-    #[arg(long, conflicts_with_all = ["token", "endpoint"])]
+    #[arg(long, conflicts_with_all = ["token", "endpoint", "mode"])]
     pub list: bool,
 }
 
@@ -87,6 +91,19 @@ mod tests {
         assert!(args.list);
         assert_eq!(args.token, None);
         assert_eq!(args.endpoint, None);
+        assert_eq!(args.mode, None);
+    }
+
+    #[test]
+    fn config_accepts_mode_flag() {
+        let args = config_args(&["omg", "config", "--mode", "operate"]);
+        assert_eq!(args.mode.as_deref(), Some("operate"));
+    }
+
+    #[test]
+    fn config_list_conflicts_with_mode() {
+        let err = parse(&["omg", "config", "--list", "--mode", "full"]).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::ArgumentConflict);
     }
 
     #[test]

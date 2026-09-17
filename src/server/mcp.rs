@@ -2,11 +2,17 @@
 // Each GoCD doc section gets a submodule with its own tool block and merged
 // router.
 
+use crate::config::Mode;
 use crate::gocd::{GocdApi, GocdCall};
+use crate::server::security;
 use rmcp::{
-    ServerHandler,
-    handler::server::router::tool::ToolRouter,
-    model::{CallToolResult, ContentBlock, Implementation, ServerCapabilities, ServerConfig},
+    ErrorData, RoleServer, ServerHandler,
+    handler::server::{router::tool::ToolRouter, tool::ToolCallContext},
+    model::{
+        CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, Implementation,
+        ServerCapabilities, ServerConfig,
+    },
+    service::RequestContext,
     tool, tool_handler, tool_router,
 };
 use std::sync::Arc;
@@ -41,11 +47,14 @@ pub mod version;
 pub struct OmgMcp {
     tool_router: ToolRouter<Self>,
     api: Arc<dyn GocdApi>,
+    mode: Mode,
 }
 
 #[tool_router]
 impl OmgMcp {
-    pub fn new(api: Arc<dyn GocdApi>) -> Self {
+    /// The service as it will face the client: the full merged router with
+    /// every tool the mode does not expose already removed from it.
+    pub fn new(api: Arc<dyn GocdApi>, mode: Mode) -> Self {
         let mut tool_router = Self::tool_router();
         tool_router.merge(Self::access_tokens_tool_router());
         tool_router.merge(Self::agents_tool_router());
@@ -69,7 +78,28 @@ impl OmgMcp {
         tool_router.merge(Self::stages_tool_router());
         tool_router.merge(Self::users_tool_router());
         tool_router.merge(Self::version_tool_router());
-        Self { tool_router, api }
+        if mode != Mode::Full {
+            for tool in tool_router.list_all() {
+                if !security::tool_visible(&tool.name, mode) {
+                    tool_router.disable_route(tool.name);
+                }
+            }
+        }
+        Self {
+            tool_router,
+            api,
+            mode,
+        }
+    }
+
+    /// Names of the tools this service actually exposes — a test view.
+    #[cfg(test)]
+    pub(crate) fn tool_names(&self) -> Vec<String> {
+        self.tool_router
+            .list_all()
+            .into_iter()
+            .map(|tool| tool.name.to_string())
+            .collect()
     }
 
     /// One GoCD call for every tool: the reply shaped by the unified pattern
@@ -94,15 +124,43 @@ impl OmgMcp {
 
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for OmgMcp {
+    // Mode-aware rejection before dispatch, gated on routes this server
+    // actually registered and then hid: a client with a stale tool list
+    // gets an explanation instead of the router's bare "tool not found",
+    // while names omg never had keep that not-found answer.
+    async fn call_tool(
+        &self,
+        request: CallToolRequestParams,
+        context: RequestContext<RoleServer>,
+    ) -> Result<CallToolResponse, ErrorData> {
+        if self.tool_router.is_disabled(&request.name)
+            && let Some(message) = security::blocked_message(&request.name, self.mode)
+        {
+            return Ok(CallToolResult::error(vec![ContentBlock::text(message)]).into());
+        }
+        let tcc = ToolCallContext::new(self, request, context);
+        self.tool_router.call(tcc).await
+    }
+
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
-            .with_server_info(Implementation::new("omg", env!("CARGO_PKG_VERSION")))
+        let config = ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
+            .with_server_info(Implementation::new("omg", env!("CARGO_PKG_VERSION")));
+        if self.mode == Mode::Full {
+            return config;
+        }
+        config.with_instructions(format!(
+            "omg runs in `{mode}` mode: everything this session may call is in its tool list, \
+             and nothing above the `{mode}` tier is there. To widen access, run \
+             `omg config --mode <view|operate|full>` and restart the session.",
+            mode = self.mode,
+        ))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::fake::{FakeGocd, first_text, service};
+    use super::fake::{FakeGocd, first_text, service, service_in};
+    use crate::config::Mode;
     use crate::gocd::{GocdCall, GocdError};
     use serde_json::{Value, json};
 
@@ -171,5 +229,50 @@ mod tests {
         assert_eq!(info.server_info.name, "omg");
         assert_eq!(info.server_info.version, env!("CARGO_PKG_VERSION"));
         assert!(info.capabilities.tools.is_some());
+    }
+
+    fn names_in(mode: Mode) -> Vec<String> {
+        service_in(FakeGocd::replies(json!({}), None), mode).tool_names()
+    }
+
+    #[test]
+    fn view_mode_exposes_reads_and_hides_every_write_tool() {
+        let names = names_in(Mode::View);
+        assert!(names.contains(&"get_dashboard".to_string()));
+        assert!(!names.contains(&"schedule_pipeline".to_string()));
+        assert!(!names.contains(&"delete_user".to_string()));
+    }
+
+    #[test]
+    fn operate_mode_adds_operate_tools_but_keeps_danger_hidden() {
+        let names = names_in(Mode::Operate);
+        assert!(names.contains(&"schedule_pipeline".to_string()));
+        assert!(!names.contains(&"delete_user".to_string()));
+    }
+
+    #[test]
+    fn full_mode_exposes_every_registered_tool() {
+        assert_eq!(names_in(Mode::Full).len(), 71);
+    }
+
+    #[test]
+    fn a_restrictive_mode_announces_itself_in_the_server_instructions() {
+        use rmcp::ServerHandler;
+        let info = service_in(FakeGocd::replies(json!({}), None), Mode::View).get_info();
+        let instructions = info
+            .instructions
+            .expect("a restrictive mode sets instructions");
+        assert!(instructions.contains("view"), "got: {instructions}");
+        assert!(
+            instructions.contains("omg config --mode"),
+            "got: {instructions}"
+        );
+    }
+
+    #[test]
+    fn the_full_mode_sends_no_instructions() {
+        use rmcp::ServerHandler;
+        let info = service_in(FakeGocd::replies(json!({}), None), Mode::Full).get_info();
+        assert!(info.instructions.is_none());
     }
 }
