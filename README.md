@@ -126,6 +126,16 @@ Tools currently offered:
 
 - `run_stage` — trigger a stage against an existing pipeline instance (body-less POST, confirmed per the docs; GoCD answers 202 with an acceptance message).
 
+**Users**
+
+- `get_users` — list all users.
+- `get_user` — read one user by login name (returns `_etag` when GoCD sends one).
+- `create_user` — create a user from a JSON body (`login_name` required; no If-Match needed — GoCD requires none here).
+- `update_user` — update one user's attributes (`enabled`/`email`/`email_me`/`checkin_aliases`) from a JSON body (no `etag` needed — GoCD requires no If-Match here).
+- `delete_user` — delete one user by login name (disable the user first; no `etag` needed — GoCD requires no If-Match here).
+- `bulk_delete_users` — bulk delete users from a JSON body (`users`).
+- `bulk_enable_disable_users` — enable or disable users from a JSON body (`users` + `operations.enable`).
+
 ### opencode
 
 Add to your project's `opencode.json` (or `~/.config/opencode/opencode.json` to make it global):

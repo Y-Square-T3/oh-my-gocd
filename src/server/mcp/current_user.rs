@@ -1,6 +1,6 @@
 // Current User section: /go/api/current_user, API v1. The GET tool lives in the
 // root router (migrated in #2); this module adds the PATCH. GoCD neither
-// documents nor requires If-Match on it — unlike the Users API — so the tool
+// documents nor requires If-Match on it — as on the Users API — so the tool
 // takes no etag and sends none.
 
 use super::OmgMcp;
