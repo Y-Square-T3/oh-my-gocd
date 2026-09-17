@@ -70,6 +70,12 @@ Tools currently offered:
 - `update_auth_config` — replace an authorization configuration, guarded by a required `etag` (the `_etag` you read).
 - `delete_auth_config` — delete an authorization configuration by id.
 
+**Backup Config**
+
+- `get_backup_config` — read the server's backup config (schedule, post-backup script, failure/success emails).
+- `update_backup_config` — create or replace the backup config from a JSON body (the docs' POST+PUT pair, collapsed to PUT).
+- `delete_backup_config` — delete the backup config.
+
 **Agents**
 
 - `get_agents` — list all agents, registered and pending.
