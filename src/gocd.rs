@@ -5,6 +5,7 @@ pub mod authorization_config;
 pub mod backups;
 pub mod current_user;
 pub mod dashboard;
+pub mod encryption;
 
 use anyhow::Context;
 use serde_json::{Value, json};

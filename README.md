@@ -90,6 +90,10 @@ Tools currently offered:
 
 - `get_dashboard` — the personalized dashboard: pipelines with their latest instances and stage status, pipeline groups and environments.
 
+**Encryption**
+
+- `encrypt_value` — get the cipher text for a plain text value from a JSON body (`{"value": ...}`); GoCD rate-limits this to 30 requests per minute.
+
 ### opencode
 
 Add to your project's `opencode.json` (or `~/.config/opencode/opencode.json` to make it global):
