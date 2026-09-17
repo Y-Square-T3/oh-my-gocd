@@ -4,6 +4,7 @@ pub mod artifacts_config;
 pub mod authorization_config;
 pub mod backups;
 pub mod current_user;
+pub mod dashboard;
 
 use anyhow::Context;
 use serde_json::{Value, json};

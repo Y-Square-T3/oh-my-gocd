@@ -86,6 +86,10 @@ Tools currently offered:
 - `schedule_backup` — trigger an asynchronous backup of all configuration and the database.
 - `get_backup` — read one backup's status by id, or with the `backup_id` keyword `running`.
 
+**Dashboard**
+
+- `get_dashboard` — the personalized dashboard: pipelines with their latest instances and stage status, pipeline groups and environments.
+
 ### opencode
 
 Add to your project's `opencode.json` (or `~/.config/opencode/opencode.json` to make it global):

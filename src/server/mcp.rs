@@ -20,6 +20,7 @@ pub mod artifacts_config;
 pub mod authorization_config;
 pub mod backups;
 pub mod current_user;
+pub mod dashboard;
 
 #[derive(Debug, Clone)]
 pub struct OmgMcp {
@@ -37,6 +38,7 @@ impl OmgMcp {
         tool_router.merge(Self::authorization_config_tool_router());
         tool_router.merge(Self::backups_tool_router());
         tool_router.merge(Self::current_user_tool_router());
+        tool_router.merge(Self::dashboard_tool_router());
         Self { tool_router, api }
     }
 
