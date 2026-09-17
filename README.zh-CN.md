@@ -91,6 +91,29 @@ omg config --mode full      # 开放全部操作，包括删除
 
 工具如何分级、如何限制隐藏工具的调用，以及设计原因，参见 [ADR 0001](docs/adr/0001-mcp-security-mode-ladder.md)。完整工具列表见 [docs/mcp-tools.md](docs/mcp-tools.md)。
 
+### Codex
+
+安装 `omg` 并通过 `omg config` 保存 GoCD 地址和令牌后（参见[配置](#配置)），使用 Codex CLI 注册 stdio 服务器：
+
+```sh
+codex mcp add omg -- omg server --mcp
+codex mcp list
+```
+
+也可以将以下配置添加到 `~/.codex/config.toml`（对于受信任的项目，也可使用 `.codex/config.toml`）：
+
+```toml
+[mcp_servers.omg]
+command = "omg"
+args = ["server", "--mcp"]
+```
+
+请确保 Codex 进程的 `PATH` 中包含 `omg`，或者将 `command` 设置为已安装程序的绝对路径。Codex 会启动服务器，omg 会读取已保存的配置；无需在 Codex 配置中填写 GoCD 令牌。
+
+启动新的 Codex 会话，运行 `/mcp` 检查连接。然后可以尝试：“使用 omg 列出我的 GoCD 流水线。”可用工具由配置的[安全模式](#安全模式)决定；如需日常写操作，请启用 `operate`，并在修改模式后重启会话。
+
+更多配置选项参见 [Codex MCP 文档](https://developers.openai.com/codex/mcp/)。
+
 ### opencode
 
 将以下配置添加到项目的 `opencode.json` 中（如需全局生效，则添加到 `~/.config/opencode/opencode.json`）：

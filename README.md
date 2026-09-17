@@ -91,6 +91,29 @@ omg config --mode full      # nothing is withheld — deletes included
 
 How tools are tiered, how hidden tools are enforced, and why: [ADR 0001](docs/adr/0001-mcp-security-mode-ladder.md). The full list of tools is in [docs/mcp-tools.md](docs/mcp-tools.md).
 
+### Codex
+
+After installing `omg` and saving your GoCD endpoint and token with `omg config` (see [Configuration](#configuration)), register the stdio server with the Codex CLI:
+
+```sh
+codex mcp add omg -- omg server --mcp
+codex mcp list
+```
+
+Alternatively, add this to `~/.codex/config.toml` (or `.codex/config.toml` for a trusted project):
+
+```toml
+[mcp_servers.omg]
+command = "omg"
+args = ["server", "--mcp"]
+```
+
+Ensure `omg` is on the Codex process's `PATH`, or set `command` to the absolute path of the installed binary. Codex starts the server and omg reads its saved configuration; no GoCD token belongs in the Codex config.
+
+Start a new Codex session and run `/mcp` to check the connection. Then try: "Use omg to list my GoCD pipelines." Available tools follow the configured [security mode](#security-modes); enable `operate` for routine writes and restart the session after changing modes.
+
+See the [Codex MCP documentation](https://developers.openai.com/codex/mcp/) for more configuration options.
+
 ### opencode
 
 Add to your project's `opencode.json` (or `~/.config/opencode/opencode.json` to make it global):
