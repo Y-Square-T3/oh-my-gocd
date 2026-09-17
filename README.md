@@ -118,6 +118,10 @@ Tools currently offered:
 
 - `check_server_health` — whether the GoCD server is up and running (the health object, e.g. `{"health": "OK"}`).
 
+**Server Health Messages**
+
+- `get_server_health_messages` — the current server errors and warnings (message, detail, level, time), the same set the web UI shows in its errors-and-warnings modal.
+
 **Stage Instances**
 
 - `get_stage_instance` — read one stage instance (result, approval and its jobs with state transitions) by pipeline/counter/stage/counter.

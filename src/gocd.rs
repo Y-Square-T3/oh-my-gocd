@@ -10,6 +10,7 @@ pub mod jobs;
 pub mod pipeline_instances;
 pub mod pipelines;
 pub mod server_health;
+pub mod server_health_messages;
 pub mod stage_instances;
 pub mod stages;
 pub mod users;
