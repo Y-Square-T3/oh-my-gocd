@@ -2,3 +2,6 @@
 
 # rust rover
 .idea
+
+# Local agent workspace
+.serena/
