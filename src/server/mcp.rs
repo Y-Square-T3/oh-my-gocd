@@ -27,6 +27,7 @@ pub mod encryption;
 pub mod jobs;
 pub mod pipeline_instances;
 pub mod pipelines;
+pub mod plugin_info;
 pub mod server_health;
 pub mod server_health_messages;
 pub mod stage_instances;
@@ -57,6 +58,7 @@ impl OmgMcp {
         tool_router.merge(Self::jobs_tool_router());
         tool_router.merge(Self::pipeline_instances_tool_router());
         tool_router.merge(Self::pipelines_tool_router());
+        tool_router.merge(Self::plugin_info_tool_router());
         tool_router.merge(Self::server_health_tool_router());
         tool_router.merge(Self::server_health_messages_tool_router());
         tool_router.merge(Self::stage_instances_tool_router());

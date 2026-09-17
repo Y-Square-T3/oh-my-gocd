@@ -11,6 +11,7 @@ pub mod encryption;
 pub mod jobs;
 pub mod pipeline_instances;
 pub mod pipelines;
+pub mod plugin_info;
 pub mod server_health;
 pub mod server_health_messages;
 pub mod stage_instances;
