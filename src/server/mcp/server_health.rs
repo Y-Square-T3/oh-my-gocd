@@ -35,7 +35,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn check_server_health_sends_a_get_to_the_versioned_path() {
+    async fn check_server_health_sends_a_version_1_get_to_the_documented_path() {
         let fake = FakeGocd::replies(json!({}), None);
         service(fake.clone()).check_server_health().await;
 

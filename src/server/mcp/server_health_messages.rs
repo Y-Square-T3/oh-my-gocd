@@ -56,6 +56,23 @@ mod tests {
         );
     }
 
+    fn shaped_messages() -> Value {
+        json!([
+            {
+                "message": "Job 'Security-Checks/test/dependency-check' is not responding",
+                "detail": "Job <a href='/go/tab/build/detail/Security-Checks/847/test/1/dependency-check'>Security-Checks/test/dependency-check</a> is currently running but has not shown any console activity in the last 26 minute(s). This job may be hung.",
+                "level": "WARNING",
+                "time": "2018-02-27T07:36:30Z"
+            },
+            {
+                "message": "Config repo 'foo' is errored",
+                "detail": "Could not poll the repository.",
+                "level": "ERROR",
+                "time": "2018-02-27T08:00:00Z"
+            }
+        ])
+    }
+
     #[tokio::test]
     async fn get_server_health_messages_drops_links_from_every_message_and_keeps_the_rest() {
         let fake = FakeGocd::replies(docs_messages_body(), None);
@@ -63,23 +80,20 @@ mod tests {
 
         assert_ne!(result.is_error, Some(true));
         let shaped: Value = serde_json::from_str(&first_text(&result)).unwrap();
-        assert_eq!(
-            shaped,
-            json!([
-                {
-                    "message": "Job 'Security-Checks/test/dependency-check' is not responding",
-                    "detail": "Job <a href='/go/tab/build/detail/Security-Checks/847/test/1/dependency-check'>Security-Checks/test/dependency-check</a> is currently running but has not shown any console activity in the last 26 minute(s). This job may be hung.",
-                    "level": "WARNING",
-                    "time": "2018-02-27T07:36:30Z"
-                },
-                {
-                    "message": "Config repo 'foo' is errored",
-                    "detail": "Could not poll the repository.",
-                    "level": "ERROR",
-                    "time": "2018-02-27T08:00:00Z"
-                }
-            ])
-        );
+        assert_eq!(shaped, shaped_messages());
+    }
+
+    #[tokio::test]
+    async fn get_server_health_messages_injects_no_etag_into_the_array_body() {
+        // The docs' collection is a JSON array and GoCD sends no ETag for
+        // it; shaping keeps `_etag` injection to object bodies, so even a
+        // stray header cannot corrupt the list.
+        let fake = FakeGocd::replies(docs_messages_body(), Some("\"feedbeef\"".into()));
+        let result = service(fake).get_server_health_messages().await;
+
+        assert_ne!(result.is_error, Some(true));
+        let shaped: Value = serde_json::from_str(&first_text(&result)).unwrap();
+        assert_eq!(shaped, shaped_messages());
     }
 
     #[tokio::test]
