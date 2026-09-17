@@ -15,6 +15,7 @@ use std::sync::Arc;
 pub(crate) mod fake;
 
 pub mod artifact_store;
+pub mod artifacts_config;
 
 #[derive(Debug, Clone)]
 pub struct OmgMcp {
@@ -27,6 +28,7 @@ impl OmgMcp {
     pub fn new(api: Arc<dyn GocdApi>) -> Self {
         let mut tool_router = Self::tool_router();
         tool_router.merge(Self::artifact_store_tool_router());
+        tool_router.merge(Self::artifacts_config_tool_router());
         Self { tool_router, api }
     }
 

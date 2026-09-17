@@ -56,6 +56,11 @@ Tools currently offered:
 - `update_artifact_store` — replace an artifact store, guarded by a required `etag` (the `_etag` you read).
 - `delete_artifact_store` — delete an artifact store by id.
 
+**Artifacts Config**
+
+- `get_artifacts_config` — read the server-wide artifacts dir and purge settings (returns its `_etag`).
+- `update_artifacts_config` — update the artifacts config, guarded by a required `etag` (the `_etag` you read).
+
 ### opencode
 
 Add to your project's `opencode.json` (or `~/.config/opencode/opencode.json` to make it global):

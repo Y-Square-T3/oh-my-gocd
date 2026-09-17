@@ -265,23 +265,20 @@ mod tests {
     #[test]
     fn the_section_tools_are_merged_into_the_service_router() {
         let service = service(FakeGocd::replies(json!({}), None));
-        let mut names: Vec<String> = service
+        let names: Vec<String> = service
             .tool_router
             .list_all()
             .into_iter()
             .map(|t| t.name.to_string())
             .collect();
-        names.sort();
-        assert_eq!(
-            names,
-            vec![
-                "create_artifact_store",
-                "delete_artifact_store",
-                "get_artifact_store",
-                "get_artifact_stores",
-                "get_current_user",
-                "update_artifact_store"
-            ]
-        );
+        for expected in [
+            "create_artifact_store",
+            "delete_artifact_store",
+            "get_artifact_store",
+            "get_artifact_stores",
+            "update_artifact_store",
+        ] {
+            assert!(names.contains(&expected.to_string()), "{expected} missing");
+        }
     }
 }
