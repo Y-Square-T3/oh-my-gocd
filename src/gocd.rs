@@ -1,3 +1,4 @@
+pub mod access_tokens;
 pub mod agents;
 pub mod artifact_store;
 pub mod artifacts_config;

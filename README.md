@@ -76,6 +76,15 @@ Tools currently offered:
 - `update_backup_config` — create or replace the backup config from a JSON body (the docs' POST+PUT pair, collapsed to PUT).
 - `delete_backup_config` — delete the backup config.
 
+**Access Tokens**
+
+- `get_current_user_access_tokens` — list the token's own user's access tokens (creation is deliberately not exposed).
+- `get_current_user_access_token` — read one of the user's own tokens by id.
+- `revoke_current_user_access_token` — revoke one of the user's own tokens from a JSON body (`{"revoke_cause": ...}`; no `etag` needed — GoCD requires no If-Match here).
+- `get_admin_access_tokens` — list all users' tokens (admin), with optional `filter` (`all`/`active`/`revoked`; unset sends no query).
+- `get_admin_access_token` — read any user's token by id (admin).
+- `revoke_admin_access_token` — revoke any user's token from a JSON body (`{"revoke_cause": ...}`; admin; no If-Match needed).
+
 **Agents**
 
 - `get_agents` — list all agents, registered and pending.
