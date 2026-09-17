@@ -114,6 +114,10 @@ Tools currently offered:
 - `schedule_pipeline` — trigger a new instance from an optional JSON body (`environment_variables`/`materials`/`update_materials_before_scheduling`).
 - `compare_pipeline_instances` — the material changes between two pipeline instances.
 
+**Server Health**
+
+- `check_server_health` — whether the GoCD server is up and running (the health object, e.g. `{"health": "OK"}`).
+
 **Stage Instances**
 
 - `get_stage_instance` — read one stage instance (result, approval and its jobs with state transitions) by pipeline/counter/stage/counter.
