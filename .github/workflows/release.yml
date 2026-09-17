@@ -139,9 +139,7 @@ jobs:
           merge-multiple: true
 
       - name: Prepare installer assets
-        run: |
-          sha256sum dist/omg-linux-amd64.tar.gz dist/omg-macos-arm64.tar.gz dist/omg-windows-amd64.zip > dist/SHA256SUMS
-          cp install.sh install.ps1 dist/
+        run: sh scripts/prepare-release-assets.sh dist
 
       - name: Create release
         env:

@@ -41,7 +41,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test Linux installer
         if: runner.os == 'Linux'
-        run: bash tests/install-linux.sh
+        run: |
+          bash tests/install-linux.sh
+          bash tests/release-assets.sh
       - name: Test Windows installer
         if: runner.os == 'Windows'
         shell: pwsh
