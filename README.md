@@ -47,7 +47,7 @@ It authenticates with the saved `server.endpoint` and `server.token`, and fails 
 
 ### Security modes
 
-The MCP server is a guardrail for whoever — usually an AI agent — holds the session, so each tool belongs to one of three tiers and the saved `mcp.mode` decides how far up the ladder a session reaches. Every mode includes the tiers below it:
+Every tool belongs to one of three tiers and the saved `mcp.mode` decides how far up the ladder an MCP session reaches. Each mode includes the tiers below it:
 
 | Mode | What it exposes |
 | --- | --- |
@@ -61,13 +61,10 @@ omg config --mode operate   # day-to-day pipeline driving
 omg config --mode full      # nothing is withheld — deletes included
 ```
 
-- Unset `mcp.mode` means `view`: omg is safe out of the box. **Upgraders beware** — every release before this one exposed all tools; if an existing agent workflow writes to GoCD, it needs an explicit `omg config --mode operate` (or `full`) after upgrading.
-- A mode change is read at server startup — restart the MCP client session to apply it. `omg config --list` shows the saved mode, or `mode: <unset> (default: view)`.
-- Hidden tools do not appear in the session's tool list at all, and a call that sneaks through (e.g. a client with a stale cached list) is rejected with an explanation naming the mode and the way out.
-- Only the canonical values `view`, `operate`, `full` are accepted, from the CLI and in the file; anything else fails loudly rather than guessing.
-- The per-tool tier table lives in `src/server/security.rs`; a new tool without a tier is treated as danger, and the test suite refuses to ship one.
+- Unset means `view` — omg is safe out of the box. **Upgraders beware**: earlier releases exposed all tools, so a workflow that writes to GoCD needs an explicit `omg config --mode operate` (or `full`).
+- The mode is read at server startup — restart the MCP client session to apply a change. `omg config --list` shows the saved value.
 
-The full list of tools is in [docs/mcp-tools.md](docs/mcp-tools.md).
+How tools are tiered, how hidden tools are enforced, and why: [ADR 0001](docs/adr/0001-mcp-security-mode-ladder.md). The full list of tools is in [docs/mcp-tools.md](docs/mcp-tools.md).
 
 ### opencode
 
