@@ -9,13 +9,13 @@
 
 ## 安装
 
-### Linux（x86-64）
+### Linux（x86-64 / ARM64）
 
 ```sh
 curl --proto '=https' --tlsv1.2 -fsSL https://github.com/Y-Square-T3/oh-my-gocd/releases/latest/download/install.sh | sh
 ```
 
-无需安装 Rust 工具链。安装程序会校验发布文件、将 `omg` 安装到 `~/.local/bin`，并在需要时将该目录加入 shell 的 `PATH`。如果安装程序修改了 shell 配置，请重启终端。预编译程序需要兼容的、基于 glibc 的发行版；ARM64、Alpine/musl 或 glibc 版本较旧的系统请使用下方的 Cargo 安装方式。
+无需安装 Rust 工具链。安装程序会校验发布文件、将 `omg` 安装到 `~/.local/bin`，并在需要时将该目录加入 shell 的 `PATH`。如果安装程序修改了 shell 配置，请重启终端。预编译程序需要兼容的、基于 glibc 的发行版；Alpine/musl 或 glibc 版本较旧的系统请使用下方的 Cargo 安装方式。
 
 ### Windows（x64）
 

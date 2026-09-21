@@ -9,13 +9,13 @@
 
 ## Installation
 
-### Linux (x86-64)
+### Linux (x86-64 / ARM64)
 
 ```sh
 curl --proto '=https' --tlsv1.2 -fsSL https://github.com/Y-Square-T3/oh-my-gocd/releases/latest/download/install.sh | sh
 ```
 
-No Rust toolchain is required. The installer verifies the release checksum, installs `omg` to `~/.local/bin`, and adds that directory to your shell `PATH` when needed. Restart the terminal if it updates your shell profile. The prebuilt binary requires a compatible glibc-based distribution; use the Cargo method below on ARM64, Alpine/musl, or older glibc systems.
+No Rust toolchain is required. The installer verifies the release checksum, installs `omg` to `~/.local/bin`, and adds that directory to your shell `PATH` when needed. Restart the terminal if it updates your shell profile. The prebuilt binary requires a compatible glibc-based distribution; use the Cargo method below on Alpine/musl or older glibc systems.
 
 ### Windows (x64)
 

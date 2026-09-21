@@ -13,5 +13,5 @@ dist_dir=$1
 cp "$repository_dir/install.sh" "$repository_dir/install.ps1" "$dist_dir/"
 (
   cd "$dist_dir"
-  sha256sum omg-linux-amd64.tar.gz omg-macos-arm64.tar.gz omg-windows-amd64.zip > SHA256SUMS
+  sha256sum omg-linux-amd64.tar.gz omg-linux-arm64.tar.gz omg-macos-arm64.tar.gz omg-windows-amd64.zip > SHA256SUMS
 )

@@ -4,7 +4,6 @@ set -eu
 repository="Y-Square-T3/oh-my-gocd"
 download_base_url=${OMG_DOWNLOAD_BASE_URL:-"https://github.com/$repository/releases/latest/download"}
 install_dir=${OMG_INSTALL_DIR:-"$HOME/.local/bin"}
-archive_name="omg-linux-amd64.tar.gz"
 
 fail() {
   printf 'error: %s\n' "$1" >&2
@@ -16,7 +15,8 @@ command -v sha256sum >/dev/null 2>&1 || fail "sha256sum is required"
 
 [ "$(uname -s)" = "Linux" ] || fail "this installer supports Linux only"
 case "$(uname -m)" in
-  x86_64 | amd64) ;;
+  x86_64 | amd64) archive_name="omg-linux-amd64.tar.gz" ;;
+  aarch64 | arm64) archive_name="omg-linux-arm64.tar.gz" ;;
   *) fail "no prebuilt binary is available for architecture $(uname -m); use cargo install oh-my-gocd" ;;
 esac
 

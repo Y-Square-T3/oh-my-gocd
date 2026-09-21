@@ -7,6 +7,7 @@ trap 'rm -rf "$test_root"' EXIT
 dist_dir="$test_root/dist"
 mkdir -p "$dist_dir"
 printf linux > "$dist_dir/omg-linux-amd64.tar.gz"
+printf linux > "$dist_dir/omg-linux-arm64.tar.gz"
 printf macos > "$dist_dir/omg-macos-arm64.tar.gz"
 printf windows > "$dist_dir/omg-windows-amd64.zip"
 
