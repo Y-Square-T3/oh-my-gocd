@@ -18,7 +18,7 @@ pub enum Tier {
     Danger,
 }
 
-// The accepted tier table: 32 view, 22 operate, 17 danger — 71 tools.
+// The accepted tier table: 33 view, 22 operate, 17 danger — 72 tools.
 const VIEW_TOOLS: &[&str] = &[
     "check_server_health",
     "compare_pipeline_instances",
@@ -39,6 +39,7 @@ const VIEW_TOOLS: &[&str] = &[
     "get_current_user_access_token",
     "get_current_user_access_tokens",
     "get_dashboard",
+    "get_job_artifacts",
     "get_job_history",
     "get_job_instance",
     "get_maintenance_mode_info",

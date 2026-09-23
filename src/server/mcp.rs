@@ -23,6 +23,7 @@ pub(crate) mod fake;
 pub mod access_tokens;
 pub mod agents;
 pub mod artifact_store;
+pub mod artifacts;
 pub mod artifacts_config;
 pub mod authorization_config;
 pub mod backup_config;
@@ -59,6 +60,7 @@ impl OmgMcp {
         tool_router.merge(Self::access_tokens_tool_router());
         tool_router.merge(Self::agents_tool_router());
         tool_router.merge(Self::artifact_store_tool_router());
+        tool_router.merge(Self::artifacts_tool_router());
         tool_router.merge(Self::artifacts_config_tool_router());
         tool_router.merge(Self::authorization_config_tool_router());
         tool_router.merge(Self::backup_config_tool_router());
@@ -252,7 +254,7 @@ mod tests {
 
     #[test]
     fn full_mode_exposes_every_registered_tool() {
-        assert_eq!(names_in(Mode::Full).len(), 71);
+        assert_eq!(names_in(Mode::Full).len(), 72);
     }
 
     #[test]

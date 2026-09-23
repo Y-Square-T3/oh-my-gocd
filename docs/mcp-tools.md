@@ -17,6 +17,10 @@ security tiers described in the
 - `update_artifact_store` — replace an artifact store, guarded by a required `etag` (the `_etag` you read).
 - `delete_artifact_store` — delete an artifact store by id.
 
+**Artifacts**
+
+- `get_job_artifacts` — a job's artifact tree as plain JSON (`files/.../<job>.json`; the absolute `url` fields are kept as retrieval pointers — file/directory downloads and uploads stay out of scope).
+
 **Artifacts Config**
 
 - `get_artifacts_config` — read the server-wide artifacts dir and purge settings (returns its `_etag`).
