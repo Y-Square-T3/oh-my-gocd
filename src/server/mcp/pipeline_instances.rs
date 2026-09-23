@@ -61,7 +61,7 @@ impl OmgMcp {
     }
 
     #[tool(
-        description = "List the past instances of a pipeline (GET /go/api/pipelines/:pipeline_name/history, API v1). Supports cursor based pagination: optional query args page_size (10-100, default 10), after and before take their values from the history's own next/previous links; unset args are omitted. Returns the `pipelines` array of pipeline instance objects with all `_links` removed and `_etag` included when GoCD sent one. Docs: https://api.gocd.org/current/#get-pipeline-history"
+        description = "List the past instances of a pipeline (GET /go/api/pipelines/:pipeline_name/history, API v1). Supports cursor based pagination: optional query args page_size (10-100, default 10), after and before take their values from the history's own next/previous links; unset args are omitted. To ask what a pipeline is doing right now prefer the derived get_pipeline_latest_status — one call, latest instance merged with operational flags. Returns the `pipelines` array of pipeline instance objects with all `_links` removed and `_etag` included when GoCD sent one. Docs: https://api.gocd.org/current/#get-pipeline-history"
     )]
     async fn get_pipeline_history(
         &self,
@@ -418,6 +418,7 @@ mod tests {
         let history = described("get_pipeline_history");
         assert!(history.contains("GET /go/api/pipelines/:pipeline_name/history"));
         assert!(history.contains("#get-pipeline-history"));
+        assert!(history.contains("get_pipeline_latest_status"));
 
         let comment = described("comment_pipeline_instance");
         assert!(

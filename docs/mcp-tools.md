@@ -19,8 +19,8 @@ security tiers described in the
 
 **Artifacts**
 
-- `get_job_artifacts` — a job's artifact tree as plain JSON (`files/.../<job>.json`; the absolute `url` fields are kept as retrieval pointers — directory-zip downloads and uploads stay out of scope).
-- `get_job_artifact_file` — one artifact file as text (`files/.../<job>/<path>`; bytes are lossy-decoded, never refused; uncapped; a `[artifact] <path> | content-type | <N> bytes` line precedes the content).
+- `get_job_artifacts` — a job's artifact tree as plain JSON (`files/.../<job>.json`; the absolute `url` fields are kept as retrieval pointers — directory-zip downloads and uploads stay out of scope; for the console log or the code-review report prefer the derived tools below).
+- `get_job_artifact_file` — one artifact file as text (`files/.../<job>/<path>`; bytes are lossy-decoded, never refused; uncapped; a `[artifact] <path> | content-type | <N> bytes` line precedes the content; for the standard files prefer the derived tools below).
 
 **Artifacts Config**
 
@@ -95,7 +95,7 @@ security tiers described in the
 **Pipeline Instances**
 
 - `get_pipeline_instance` — read one pipeline instance (build cause, stages and jobs) by pipeline name and counter.
-- `get_pipeline_history` — list a pipeline's past instances, with optional `page_size`/`after`/`before` cursor pagination.
+- `get_pipeline_history` — list a pipeline's past instances, with optional `page_size`/`after`/`before` cursor pagination (for "what is it doing right now" prefer the derived `get_pipeline_latest_status`).
 - `comment_pipeline_instance` — attach a comment (e.g. a failure reason) to a pipeline instance from a JSON body (`{"comment": ...}`).
 
 **Pipelines**
@@ -145,3 +145,13 @@ security tiers described in the
 **Version**
 
 - `get_version` — the GoCD server version details (version, build number, git SHA, full version, commit URL).
+
+**Derived Conveniences**
+
+omg inventions composed over the low-level endpoints above — they add no GoCD
+operation, answer the questions agents ask in one call, and are the tools to
+reach for first ([ADR 0002](adr/0002-derived-convenience-tools.md)).
+
+- `get_job_console_log` — a job's `cruise-output/console.log` as pure text, no metadata line; when the file is absent, a `[no console log] ...` notice rather than an error.
+- `get_job_code_review` — a job's `code-review/code_review/reports/index.html` verbatim; when the job ran no review, a `[no code review] ...` notice rather than an error.
+- `get_pipeline_latest_status` — one call for what a pipeline is doing right now: the latest instance (counter, label, scheduled_date, build_cause, stages[] with their jobs[] — the coordinates every `get_job_*` tool takes) merged flat with `{paused, paused_cause, paused_by, locked, schedulable}`; `_links` removed, no `_etag`; a tool error if the pipeline has never run.

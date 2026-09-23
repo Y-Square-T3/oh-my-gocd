@@ -30,6 +30,7 @@ pub mod backup_config;
 pub mod backups;
 pub mod current_user;
 pub mod dashboard;
+pub mod derived;
 pub mod encryption;
 pub mod jobs;
 pub mod maintenance_mode;
@@ -67,6 +68,7 @@ impl OmgMcp {
         tool_router.merge(Self::backups_tool_router());
         tool_router.merge(Self::current_user_tool_router());
         tool_router.merge(Self::dashboard_tool_router());
+        tool_router.merge(Self::derived_tool_router());
         tool_router.merge(Self::encryption_tool_router());
         tool_router.merge(Self::jobs_tool_router());
         tool_router.merge(Self::maintenance_mode_tool_router());
@@ -262,7 +264,7 @@ mod tests {
 
     #[test]
     fn full_mode_exposes_every_registered_tool() {
-        assert_eq!(names_in(Mode::Full).len(), 73);
+        assert_eq!(names_in(Mode::Full).len(), 76);
     }
 
     #[test]

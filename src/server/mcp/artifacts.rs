@@ -61,7 +61,7 @@ fn artifact_answer(file: &JobArtifactFile, reply: &GocdReply) -> String {
 #[tool_router(router = artifacts_tool_router, vis = "pub(crate)")]
 impl OmgMcp {
     #[tool(
-        description = "List a job's artifacts as a plain JSON tree (GET /go/files/:pipeline_name/:pipeline_counter/:stage_name/:stage_counter/:job_name.json, API v1). Each node carries name, url, type plus folder `files`/leaf `path`/`created_time`/`size`; these objects contain no `_links`, so the uniform shaping returns the tree verbatim and the absolute `url` fields are kept as the pointer for a human to retrieve a file. The tool answers the JSON listing only — file and directory downloads, uploads and appends are out of scope. Docs: https://api.gocd.org/current/#artifacts"
+        description = "List a job's artifacts as a plain JSON tree (GET /go/files/:pipeline_name/:pipeline_counter/:stage_name/:stage_counter/:job_name.json, API v1). Each node carries name, url, type plus folder `files`/leaf `path`/`created_time`/`size`; these objects contain no `_links`, so the uniform shaping returns the tree verbatim and the absolute `url` fields are kept as the pointer for a human to retrieve a file. For a job's console log prefer get_job_console_log, and for its code-review report get_job_code_review — this listing is for everything else. The tool answers the JSON listing only — file and directory downloads, uploads and appends are out of scope. Docs: https://api.gocd.org/current/#artifacts"
     )]
     async fn get_job_artifacts(
         &self,
@@ -78,7 +78,7 @@ impl OmgMcp {
     }
 
     #[tool(
-        description = "Read one artifact file of a job as text (GET /go/files/:pipeline_name/:pipeline_counter/:stage_name/:stage_counter/:job_name/*path_to_file, API v1). Response bytes are lossy-decoded as UTF-8 and returned in full — a binary artifact comes back as text soup, never as a refusal — with no size cap; the transport's 10s client timeout is the only bound, so ask for small files. The answer is one metadata line, `[artifact] <path> | content-type: <ct> | <N> bytes` — N sizes the returned text — then the content verbatim. Use get_job_artifacts first to see the tree and each file's `url`. Directory-zip downloads, uploads and appends are out of scope. Docs: https://api.gocd.org/current/#get-artifact-file"
+        description = "Read one artifact file of a job as text (GET /go/files/:pipeline_name/:pipeline_counter/:stage_name/:stage_counter/:job_name/*path_to_file, API v1). Response bytes are lossy-decoded as UTF-8 and returned in full — a binary artifact comes back as text soup, never as a refusal — with no size cap; the transport's 10s client timeout is the only bound, so ask for small files. The answer is one metadata line, `[artifact] <path> | content-type: <ct> | <N> bytes` — N sizes the returned text — then the content verbatim. Use get_job_artifacts first to see the tree and each file's `url`. For the standard files prefer the derived tools: get_job_console_log for cruise-output/console.log and get_job_code_review for the code-review report. Directory-zip downloads, uploads and appends are out of scope. Docs: https://api.gocd.org/current/#get-artifact-file"
     )]
     async fn get_job_artifact_file(
         &self,
@@ -230,6 +230,27 @@ mod tests {
         ));
         assert!(description.contains("API v1"));
         assert!(description.contains("#artifacts"));
+    }
+
+    #[test]
+    fn the_artifacts_descriptions_point_at_the_derived_tools() {
+        let service = service(FakeGocd::replies(json!({}), None));
+        let description = |name: &str| {
+            service
+                .tool_router
+                .list_all()
+                .into_iter()
+                .find(|t| t.name == name)
+                .expect(name)
+                .description
+                .map(|d| d.to_string())
+                .unwrap_or_default()
+        };
+        let file = description("get_job_artifact_file");
+        assert!(file.contains("get_job_console_log"), "got: {file}");
+        assert!(file.contains("get_job_code_review"), "got: {file}");
+        let listing = description("get_job_artifacts");
+        assert!(listing.contains("get_job_console_log"), "got: {listing}");
     }
 
     #[test]
