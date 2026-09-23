@@ -1,11 +1,13 @@
 // Artifacts section: GET /go/files/:pipeline_name/:pipeline_counter/
 // :stage_name/:stage_counter/:job_name.json — the plain JSON artifact-tree
-// listing only. The section's other five documented operations (file and
-// directory downloads, create, create-multiple, append) stay out of scope by
-// recorded decision: their payloads the JSON-only seam cannot carry.
+// listing — and GET .../:job_name/*path_to_file — one artifact file, answered
+// as lossy-decoded text with a metadata line. The section's remaining four
+// operations (directory-zip download, create, create-multiple, append) stay
+// out of scope by recorded decision.
 
-use super::OmgMcp;
-use crate::gocd::artifacts;
+use super::{OmgMcp, tool_error};
+use crate::gocd::{GocdReply, artifacts};
+use rmcp::model::ContentBlock;
 use rmcp::schemars::JsonSchema;
 use rmcp::{handler::server::wrapper::Parameters, model::CallToolResult, tool, tool_router};
 use serde::Deserialize;
@@ -25,6 +27,37 @@ pub(crate) struct JobArtifactsPath {
     pub job_name: String,
 }
 
+#[derive(Debug, Deserialize, JsonSchema)]
+#[schemars(crate = "rmcp::schemars")]
+pub(crate) struct JobArtifactFile {
+    /// The pipeline name, e.g. "pipeline1".
+    pub pipeline_name: String,
+    /// The pipeline counter, e.g. "1".
+    pub pipeline_counter: String,
+    /// The stage name, e.g. "defaultStage".
+    pub stage_name: String,
+    /// The stage counter, e.g. "1".
+    pub stage_counter: String,
+    /// The job name, e.g. "defaultJob".
+    pub job_name: String,
+    /// The artifact-relative path of the file to read, e.g.
+    /// "cruise-output/console.log".
+    pub path_to_file: String,
+}
+
+/// The file tool's advertised answer: one metadata line naming the path, the
+/// GoCD content-type (or `unknown`) and the byte size, then the content
+/// verbatim.
+fn artifact_answer(file: &JobArtifactFile, reply: &GocdReply) -> String {
+    let content = reply.body.as_str().unwrap_or_default();
+    let content_type = reply.content_type.as_deref().unwrap_or("unknown");
+    format!(
+        "[artifact] {} | content-type: {content_type} | {} bytes\n\n{content}",
+        file.path_to_file,
+        content.len()
+    )
+}
+
 #[tool_router(router = artifacts_tool_router, vis = "pub(crate)")]
 impl OmgMcp {
     #[tool(
@@ -42,6 +75,29 @@ impl OmgMcp {
             &args.job_name,
         ))
         .await
+    }
+
+    #[tool(
+        description = "Read one artifact file of a job as text (GET /go/files/:pipeline_name/:pipeline_counter/:stage_name/:stage_counter/:job_name/*path_to_file, API v1). Response bytes are lossy-decoded as UTF-8 and returned in full — a binary artifact comes back as text soup, never as a refusal — with no size cap; the transport's 10s client timeout is the only bound, so ask for small files. The answer is one metadata line, `[artifact] <path> | content-type: <ct> | <N> bytes` — N sizes the returned text — then the content verbatim. Use get_job_artifacts first to see the tree and each file's `url`. Directory-zip downloads, uploads and appends are out of scope. Docs: https://api.gocd.org/current/#get-artifact-file"
+    )]
+    async fn get_job_artifact_file(
+        &self,
+        Parameters(args): Parameters<JobArtifactFile>,
+    ) -> CallToolResult {
+        let call = artifacts::file(
+            &args.pipeline_name,
+            &args.pipeline_counter,
+            &args.stage_name,
+            &args.stage_counter,
+            &args.job_name,
+            &args.path_to_file,
+        );
+        match self.api.request(call).await {
+            Ok(reply) => {
+                CallToolResult::success(vec![ContentBlock::text(artifact_answer(&args, &reply))])
+            }
+            Err(err) => tool_error(&err),
+        }
     }
 }
 
@@ -192,5 +248,148 @@ mod tests {
     fn view_mode_exposes_the_artifacts_listing() {
         let names = service_in(FakeGocd::replies(json!({}), None), Mode::View).tool_names();
         assert!(names.contains(&"get_job_artifacts".to_string()));
+    }
+
+    fn file_args() -> super::JobArtifactFile {
+        super::JobArtifactFile {
+            pipeline_name: "pipeline1".into(),
+            pipeline_counter: "1".into(),
+            stage_name: "defaultStage".into(),
+            stage_counter: "1".into(),
+            job_name: "defaultJob".into(),
+            path_to_file: "cruise-output/console.log".into(),
+        }
+    }
+
+    #[tokio::test]
+    async fn get_job_artifact_file_sends_a_raw_version_1_get_to_the_templated_path() {
+        let fake = FakeGocd::raw_replies("", None);
+        service(fake.clone())
+            .get_job_artifact_file(Parameters(file_args()))
+            .await;
+
+        assert_eq!(
+            fake.recorded(),
+            vec![
+                GocdCall::get(
+                    "files/pipeline1/1/defaultStage/1/defaultJob/cruise-output/console.log"
+                )
+                .version(1)
+                .raw()
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_leading_slash_on_the_path_does_not_double_up() {
+        let fake = FakeGocd::raw_replies("", None);
+        let mut args = file_args();
+        args.path_to_file = "/console.log".into();
+        service(fake.clone())
+            .get_job_artifact_file(Parameters(args))
+            .await;
+
+        assert_eq!(
+            fake.recorded()[0].path,
+            "files/pipeline1/1/defaultStage/1/defaultJob/console.log"
+        );
+    }
+
+    #[tokio::test]
+    async fn get_job_artifact_file_answers_the_metadata_line_then_the_content() {
+        let fake = FakeGocd::raw_replies("boom\n", Some("text/plain; charset=utf-8"));
+        let result = service(fake)
+            .get_job_artifact_file(Parameters(file_args()))
+            .await;
+
+        assert_eq!(result.is_error, Some(false));
+        assert_eq!(
+            first_text(&result),
+            "[artifact] cruise-output/console.log | content-type: text/plain; charset=utf-8 | 5 bytes\n\nboom\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_type_less_file_still_answers_its_line_then_the_content() {
+        let fake = FakeGocd::raw_replies("", None);
+        let result = service(fake)
+            .get_job_artifact_file(Parameters(file_args()))
+            .await;
+
+        assert_eq!(
+            first_text(&result),
+            "[artifact] cruise-output/console.log | content-type: unknown | 0 bytes\n\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn binary_soup_comes_back_as_text_never_as_a_refusal() {
+        // Two raw bytes, 0xFF is not valid UTF-8: the production lossy mapper
+        // turns them into U+FFFD + 'k' — 4 bytes of returned text, which is
+        // what the line's size describes.
+        let fake = FakeGocd::raw_bytes_replies(&[0xff, b'k'], Some("application/java-archive"));
+        let result = service(fake)
+            .get_job_artifact_file(Parameters(file_args()))
+            .await;
+
+        assert_eq!(result.is_error, Some(false));
+        assert_eq!(
+            first_text(&result),
+            "[artifact] cruise-output/console.log | content-type: application/java-archive | 4 bytes\n\n\u{FFFD}k"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unauthorized_file_read_surfaces_the_token_hint() {
+        let fake = FakeGocd::fails(GocdError::Http { status: 401 });
+        let result = service(fake)
+            .get_job_artifact_file(Parameters(file_args()))
+            .await;
+
+        assert_eq!(result.is_error, Some(true));
+        let text = first_text(&result);
+        assert!(text.contains("401"), "got: {text}");
+        assert!(text.contains("token"), "got: {text}");
+    }
+
+    #[tokio::test]
+    async fn a_not_found_file_read_surfaces_the_endpoint_hint() {
+        let fake = FakeGocd::fails(GocdError::Http { status: 404 });
+        let result = service(fake)
+            .get_job_artifact_file(Parameters(file_args()))
+            .await;
+
+        assert_eq!(result.is_error, Some(true));
+        let text = first_text(&result);
+        assert!(text.contains("404"), "got: {text}");
+        assert!(text.contains("endpoint"), "got: {text}");
+    }
+
+    #[test]
+    fn the_file_tool_description_cites_the_endpoint_and_its_semantics() {
+        let service = service(FakeGocd::replies(json!({}), None));
+        let description = service
+            .tool_router
+            .list_all()
+            .into_iter()
+            .find(|t| t.name == "get_job_artifact_file")
+            .expect("get_job_artifact_file registered")
+            .description
+            .map(|d| d.to_string())
+            .unwrap_or_default();
+
+        assert!(description.contains(
+            "GET /go/files/:pipeline_name/:pipeline_counter/:stage_name/:stage_counter/:job_name/*path_to_file"
+        ));
+        assert!(description.contains("API v1"));
+        assert!(description.contains("#get-artifact-file"));
+        assert!(description.contains("lossy"), "got: {description}");
+        assert!(description.contains("no size cap"), "got: {description}");
+    }
+
+    #[test]
+    fn the_file_tool_is_merged_into_the_service_router_and_viewable_in_view_mode() {
+        let names = service_in(FakeGocd::replies(json!({}), None), Mode::View).tool_names();
+        assert!(names.contains(&"get_job_artifact_file".to_string()));
     }
 }

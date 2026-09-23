@@ -2,7 +2,7 @@
 // reused by every section's tool tests. It records each outgoing GocdCall
 // and replays one canned outcome.
 
-use crate::gocd::{GocdApi, GocdCall, GocdError, GocdReply};
+use crate::gocd::{GocdApi, GocdCall, GocdError, GocdReply, raw_reply};
 use rmcp::model::{CallToolResult, ContentBlock};
 use serde_json::Value;
 use std::future::Future;
@@ -19,7 +19,29 @@ impl FakeGocd {
     pub(crate) fn replies(body: Value, etag: Option<String>) -> Arc<Self> {
         Arc::new(Self {
             calls: Mutex::new(Vec::new()),
-            outcome: Ok(GocdReply { body, etag }),
+            outcome: Ok(GocdReply {
+                body,
+                etag,
+                content_type: None,
+            }),
+        })
+    }
+
+    /// A canned `.raw()` reply built by the production mapper, from text.
+    pub(crate) fn raw_replies(text: &str, content_type: Option<&str>) -> Arc<Self> {
+        Self::raw_bytes_replies(text.as_bytes(), content_type)
+    }
+
+    /// A canned `.raw()` reply from the exact bytes GoCD would have sent —
+    /// through the production lossy mapper, so a test can feed invalid UTF-8.
+    pub(crate) fn raw_bytes_replies(bytes: &[u8], content_type: Option<&str>) -> Arc<Self> {
+        Arc::new(Self {
+            calls: Mutex::new(Vec::new()),
+            outcome: Ok(raw_reply(
+                bytes.to_vec(),
+                None,
+                content_type.map(str::to_owned),
+            )),
         })
     }
 

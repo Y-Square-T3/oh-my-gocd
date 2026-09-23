@@ -19,7 +19,8 @@ security tiers described in the
 
 **Artifacts**
 
-- `get_job_artifacts` — a job's artifact tree as plain JSON (`files/.../<job>.json`; the absolute `url` fields are kept as retrieval pointers — file/directory downloads and uploads stay out of scope).
+- `get_job_artifacts` — a job's artifact tree as plain JSON (`files/.../<job>.json`; the absolute `url` fields are kept as retrieval pointers — directory-zip downloads and uploads stay out of scope).
+- `get_job_artifact_file` — one artifact file as text (`files/.../<job>/<path>`; bytes are lossy-decoded, never refused; uncapped; a `[artifact] <path> | content-type | <N> bytes` line precedes the content).
 
 **Artifacts Config**
 

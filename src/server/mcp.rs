@@ -3,7 +3,7 @@
 // router.
 
 use crate::config::Mode;
-use crate::gocd::{GocdApi, GocdCall};
+use crate::gocd::{GocdApi, GocdCall, GocdError};
 use crate::server::security;
 use rmcp::{
     ErrorData, RoleServer, ServerHandler,
@@ -104,14 +104,16 @@ impl OmgMcp {
             .collect()
     }
 
-    /// One GoCD call for every tool: the reply shaped by the unified pattern
-    /// on success, an actionable hint on failure.
+    /// The shaping call behind almost every tool: the reply shaped by the
+    /// unified pattern on success, an actionable hint on failure. (The one
+    /// raw-text tool builds its success block itself but funnels failures
+    /// through [`tool_error`].)
     pub(crate) async fn request_shaped(&self, call: GocdCall) -> CallToolResult {
         match self.api.request(call).await {
             Ok(reply) => {
                 CallToolResult::success(vec![ContentBlock::text(reply.shaped().to_string())])
             }
-            Err(err) => CallToolResult::error(vec![ContentBlock::text(err.tool_message())]),
+            Err(err) => tool_error(&err),
         }
     }
 
@@ -122,6 +124,12 @@ impl OmgMcp {
         self.request_shaped(GocdCall::get("api/current_user").version(1))
             .await
     }
+}
+
+/// The failure answer every tool shares: the error's actionable hint as a
+/// tool-error text block.
+pub(crate) fn tool_error(err: &GocdError) -> CallToolResult {
+    CallToolResult::error(vec![ContentBlock::text(err.tool_message())])
 }
 
 #[tool_handler(router = self.tool_router)]
@@ -254,7 +262,7 @@ mod tests {
 
     #[test]
     fn full_mode_exposes_every_registered_tool() {
-        assert_eq!(names_in(Mode::Full).len(), 72);
+        assert_eq!(names_in(Mode::Full).len(), 73);
     }
 
     #[test]

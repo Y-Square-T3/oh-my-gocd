@@ -62,6 +62,7 @@ pub struct GocdCall {
     pub body: Option<Value>,
     pub if_match: Option<String>,
     pub confirm: bool,
+    pub raw: bool,
 }
 
 impl GocdCall {
@@ -94,6 +95,7 @@ impl GocdCall {
             body: None,
             if_match: None,
             confirm: false,
+            raw: false,
         }
     }
 
@@ -125,13 +127,24 @@ impl GocdCall {
         self.confirm = true;
         self
     }
+
+    /// Ask the transport for the raw-bytes response arm: the reply body is
+    /// the lossy-UTF-8 text of the response instead of a JSON parse, for
+    /// routes like `/go/files/**` that answer with file content.
+    pub fn raw(mut self) -> Self {
+        self.raw = true;
+        self
+    }
 }
 
-/// GoCD's answer: the JSON body plus the ETag header when one was sent.
+/// GoCD's answer: the body (parsed JSON, or the raw text of a `.raw()` call)
+/// plus the ETag header when one was sent and the Content-Type header when a
+/// raw reply needs it to describe the bytes it carries.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GocdReply {
     pub body: Value,
     pub etag: Option<String>,
+    pub content_type: Option<String>,
 }
 
 impl GocdReply {
@@ -162,6 +175,38 @@ fn strip_links(value: &mut Value) {
             }
         }
         _ => {}
+    }
+}
+
+/// Turn a JSON response body into the uniform reply every tool advertises:
+/// empty answers `Value::Null`, anything else is parsed, and non-JSON is the
+/// Decode error. The raw arm lives in [`raw_reply`].
+fn map_reply(text: String, etag: Option<String>) -> Result<GocdReply, GocdError> {
+    let body = if text.trim().is_empty() {
+        Value::Null
+    } else {
+        serde_json::from_str(&text).map_err(|err| GocdError::Decode(err.to_string()))?
+    };
+    Ok(GocdReply {
+        body,
+        etag,
+        content_type: None,
+    })
+}
+
+/// The `.raw()` arm, shared by the transport and the test fake: the response
+/// bytes become the lossy-UTF-8 text body — never a parse, never a refusal —
+/// with the ETag and Content-Type headers carried along for the tool to
+/// describe them.
+pub(crate) fn raw_reply(
+    bytes: Vec<u8>,
+    etag: Option<String>,
+    content_type: Option<String>,
+) -> GocdReply {
+    GocdReply {
+        body: Value::String(String::from_utf8_lossy(&bytes).into_owned()),
+        etag,
+        content_type,
     }
 }
 
@@ -241,16 +286,23 @@ impl GocdApi for HttpGocd {
                 .get(reqwest::header::ETAG)
                 .and_then(|value| value.to_str().ok())
                 .map(str::to_owned);
+            let content_type = response
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_owned);
+            if call.raw {
+                let bytes = response
+                    .bytes()
+                    .await
+                    .map_err(|err| GocdError::Decode(err.to_string()))?;
+                return Ok(raw_reply(bytes.to_vec(), etag, content_type));
+            }
             let text = response
                 .text()
                 .await
                 .map_err(|err| GocdError::Decode(err.to_string()))?;
-            let body = if text.trim().is_empty() {
-                Value::Null
-            } else {
-                serde_json::from_str(&text).map_err(|err| GocdError::Decode(err.to_string()))?
-            };
-            Ok(GocdReply { body, etag })
+            map_reply(text, etag)
         })
     }
 }
@@ -431,6 +483,7 @@ mod tests {
                 "_embedded": { "config_entries": [{ "_links": {}, "id": 7 }] }
             }),
             etag: None,
+            content_type: None,
         };
         assert_eq!(
             reply.shaped(),
@@ -447,6 +500,7 @@ mod tests {
         let with_etag = GocdReply {
             body: json!({ "name": "store" }),
             etag: Some("\"abc\"".into()),
+            content_type: None,
         };
         assert_eq!(
             with_etag.shaped(),
@@ -456,6 +510,7 @@ mod tests {
         let without_etag = GocdReply {
             body: json!({ "name": "store" }),
             etag: None,
+            content_type: None,
         };
         assert_eq!(without_etag.shaped(), json!({ "name": "store" }));
     }
@@ -470,11 +525,74 @@ mod tests {
         assert_eq!(call.body, None);
         assert_eq!(call.if_match, None);
         assert!(!call.confirm);
+        assert!(!call.raw);
     }
 
     #[test]
     fn the_confirm_builder_pins_the_bodyless_write_confirmation() {
         let call = GocdCall::post("api/pipelines/pipeline1/unpause").confirm();
         assert!(call.confirm);
+    }
+
+    #[test]
+    fn the_raw_builder_asks_for_the_bytes_response_arm() {
+        let call =
+            GocdCall::get("files/pipeline1/1/defaultStage/1/defaultJob/cruise-output/console.log")
+                .raw();
+        assert!(call.raw);
+    }
+
+    #[test]
+    fn a_raw_reply_keeps_the_text_verbatim_and_carries_the_content_type() {
+        let reply = raw_reply(
+            "boom\n".as_bytes().to_vec(),
+            None,
+            Some("text/plain; charset=utf-8".into()),
+        );
+        assert_eq!(reply.body, json!("boom\n"));
+        assert_eq!(
+            reply.content_type.as_deref(),
+            Some("text/plain; charset=utf-8")
+        );
+    }
+
+    #[test]
+    fn raw_bytes_that_are_not_valid_utf8_come_back_lossy_never_refused() {
+        let reply = raw_reply(
+            vec![0xff, b'k'],
+            None,
+            Some("application/java-archive".into()),
+        );
+        assert_eq!(reply.body, json!("\u{FFFD}k"));
+    }
+
+    #[test]
+    fn a_raw_reply_never_parses_json_and_keeps_an_empty_body_as_empty_text() {
+        let soup = raw_reply(b"{not json".to_vec(), None, None);
+        assert_eq!(soup.body, json!("{not json"));
+        let empty = raw_reply(vec![], None, None);
+        assert_eq!(empty.body, json!(""));
+    }
+
+    #[test]
+    fn a_plain_reply_still_parses_json_refuses_soup_and_nulls_empty() {
+        let parsed = map_reply("{\"a\":1}".into(), None).unwrap();
+        assert_eq!(parsed.body, json!({ "a": 1 }));
+        assert!(matches!(
+            map_reply("not json".into(), None),
+            Err(GocdError::Decode(_))
+        ));
+        let empty = map_reply("  ".into(), None).unwrap();
+        assert_eq!(empty.body, Value::Null);
+    }
+
+    #[test]
+    fn shaping_leaves_a_raw_text_reply_untouched_and_unstamped() {
+        let reply = GocdReply {
+            body: json!("log line"),
+            etag: Some("\"abc\"".into()),
+            content_type: Some("text/plain".into()),
+        };
+        assert_eq!(reply.shaped(), json!("log line"));
     }
 }
